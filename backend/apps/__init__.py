@@ -1,0 +1,1 @@
+# InsightHub Django apps package
