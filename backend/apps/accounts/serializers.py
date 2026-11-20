@@ -6,51 +6,81 @@ from .models import Role, User
 
 
 DEFAULT_ROLE_DEFINITIONS = {
-    Role.ADMIN: ("Admin", "Quản trị toàn bộ hệ thống, phân quyền và cấu hình.", ["*"]),
+    Role.ADMIN: ("Admin", "Quản trị toàn bộ hệ thống, người dùng và cấu hình."),
     Role.PRODUCT_MANAGER: (
         "Product Manager",
         "Quản lý feedback, chạy AI Engine, quản lý insight, Kanban và roadmap.",
-        ["feedback:*", "insight:*", "kanban:*", "roadmap:*", "ai:run"],
     ),
     Role.DEVELOPER: (
         "Developer",
-        "Xem và xử lý feedback/insight được phân công, cập nhật trạng thái và comment nội bộ.",
-        ["feedback:assigned", "insight:view", "kanban:update_assigned", "comment:internal"],
+        "Xem và xử lý feedback/insight được phân công, cập nhật trạng thái Kanban.",
     ),
     Role.CUSTOMER_SUPPORT: (
         "Customer Support",
-        "Tiếp nhận phản hồi đa nguồn, phân loại, comment nội bộ và phản hồi khách hàng.",
-        ["feedback:view_all", "feedback:triage", "insight:view", "comment:internal"],
+        "Tiếp nhận phản hồi đa nguồn, phân loại, đánh dấu trùng lặp và chuyển xử lý.",
     ),
     Role.CUSTOMER: (
         "Customer",
-        "Gửi phản hồi, theo dõi trạng thái xử lý, nhận thông báo và xem Public Roadmap.",
-        ["feedback:create", "feedback:own", "roadmap:public", "notification:own"],
+        "Gửi feedback, vote, theo dõi trạng thái xử lý, nhận thông báo và xem Public Roadmap.",
     ),
 }
 
 
 def ensure_default_roles() -> dict[str, Role]:
     roles: dict[str, Role] = {}
-    for code, (name, desc, perms) in DEFAULT_ROLE_DEFINITIONS.items():
+    for code, (name, desc) in DEFAULT_ROLE_DEFINITIONS.items():
         role, _ = Role.objects.get_or_create(
             code=code,
-            defaults={"name": name, "description": desc, "permissions": perms},
+            defaults={
+                "name": name,
+                "description": desc,
+                "permissions": Role.DEFAULT_PERMISSIONS.get(code, []),
+            },
         )
         roles[code] = role
     return roles
 
 
 class RoleSerializer(serializers.ModelSerializer):
+    permissions = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+    )
+    user_count = serializers.IntegerField(read_only=True, default=0)
+
     class Meta:
         model = Role
-        fields = ["id", "code", "name", "description", "permissions"]
+        fields = ["id", "code", "name", "description", "permissions", "user_count"]
+        read_only_fields = ["id", "code", "name", "description", "user_count"]
+
+    def validate_permissions(self, value: list[str]) -> list[str]:
+        invalid = [item for item in value if item not in Role.ALL_FEATURE_KEYS]
+        if invalid:
+            raise serializers.ValidationError(f"Mã chức năng không hợp lệ: {', '.join(invalid)}")
+        # Preserve canonical module ordering without duplicates
+        allowed_set = set(value)
+        return [key for key in Role.ALL_FEATURE_KEYS if key in allowed_set]
+
+    def update(self, instance: Role, validated_data):
+        if "permissions" in validated_data:
+            if instance.code == Role.ADMIN:
+                instance.permissions = list(Role.ALL_FEATURE_KEYS)
+            else:
+                instance.permissions = validated_data["permissions"]
+            instance.save(update_fields=["permissions"])
+        return instance
+
+    def to_representation(self, instance: Role):
+        data = super().to_representation(instance)
+        data["permissions"] = instance.effective_permissions()
+        return data
 
 
 class UserMinimalSerializer(serializers.ModelSerializer):
     role_code = serializers.CharField(read_only=True)
     role_name = serializers.SerializerMethodField()
     display_name = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -62,9 +92,8 @@ class UserMinimalSerializer(serializers.ModelSerializer):
             "display_name",
             "role_code",
             "role_name",
+            "permissions",
             "job_title",
-            "department",
-            "avatar_url",
             "is_active",
         ]
 
@@ -74,23 +103,17 @@ class UserMinimalSerializer(serializers.ModelSerializer):
     def get_display_name(self, obj: User) -> str:
         return obj.display_name()
 
+    def get_permissions(self, obj: User) -> list[str]:
+        return obj.get_feature_permissions()
+
 
 class UserDetailSerializer(UserMinimalSerializer):
-    permissions = serializers.SerializerMethodField()
-
     class Meta(UserMinimalSerializer.Meta):
         fields = UserMinimalSerializer.Meta.fields + [
-            "permissions",
-            "email_notifications_enabled",
             "date_joined",
             "last_login",
         ]
         read_only_fields = ["id", "date_joined", "last_login"]
-
-    def get_permissions(self, obj: User) -> list:
-        if obj.role_id:
-            return obj.role.permissions or []
-        return ["*"] if obj.is_superuser else []
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -124,7 +147,6 @@ class RegisterSerializer(serializers.Serializer):
             password=validated_data["password"],
             role=roles[Role.CUSTOMER],
             job_title="Khách hàng",
-            department="External",
         )
         return user
 
@@ -159,9 +181,6 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "full_name",
             "job_title",
-            "department",
-            "avatar_url",
-            "email_notifications_enabled",
         ]
 
 
@@ -171,19 +190,6 @@ class ChangePasswordSerializer(serializers.Serializer):
 
     def validate_new_password(self, value: str) -> str:
         validate_password(value, self.context.get("user"))
-        return value
-
-
-class ForgotPasswordSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-
-
-class ResetPasswordSerializer(serializers.Serializer):
-    token = serializers.CharField()
-    new_password = serializers.CharField(write_only=True, min_length=8)
-
-    def validate_new_password(self, value: str) -> str:
-        validate_password(value)
         return value
 
 
@@ -200,10 +206,7 @@ class AdminUserWriteSerializer(serializers.ModelSerializer):
             "full_name",
             "role_code",
             "job_title",
-            "department",
-            "avatar_url",
             "is_active",
-            "email_notifications_enabled",
             "password",
         ]
 

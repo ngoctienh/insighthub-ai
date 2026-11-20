@@ -1,13 +1,10 @@
 from django.db.models import Q
 from rest_framework import generics, permissions, status, viewsets
-from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.accounts.models import Role
-from apps.accounts.permissions import IsInternalTeam
-from apps.notifications.models import ActivityLog, Comment
-from apps.notifications.serializers import CommentSerializer
-from apps.notifications.services import log_activity, notify_roadmap_updated
+from apps.accounts.permissions import require_feature
+from apps.notifications.services import notify_roadmap_updated
 from .models import RoadmapItem
 from .serializers import PublicRoadmapItemSerializer, RoadmapItemSerializer
 
@@ -46,12 +43,12 @@ class PublicRoadmapListView(generics.ListAPIView):
 
 class RoadmapItemViewSet(viewsets.ModelViewSet):
     serializer_class = RoadmapItemSerializer
-    permission_classes = [permissions.IsAuthenticated, IsInternalTeam]
+    permission_classes = [permissions.IsAuthenticated, require_feature("roadmap")]
     pagination_class = None
 
     def get_queryset(self):
         qs = (
-            RoadmapItem.objects.select_related("product", "owner", "owner__role", "created_by")
+            RoadmapItem.objects.select_related("product", "owner", "owner__role")
             .prefetch_related("insight_groups")
             .all()
         )
@@ -84,13 +81,6 @@ class RoadmapItemViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item = serializer.save()
-        log_activity(
-            request.user,
-            ActivityLog.ENTITY_ROADMAP,
-            item.id,
-            "CREATED",
-            f"Tạo roadmap item {item.code}: {item.title} ({item.visibility})",
-        )
         notify_roadmap_updated(item, actor=request.user, created=True)
         return Response(self.get_serializer(item).data, status=status.HTTP_201_CREATED)
 
@@ -100,22 +90,9 @@ class RoadmapItemViewSet(viewsets.ModelViewSet):
             return denied
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
-        old_status = instance.status
-        old_progress = instance.progress_percent
-
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         updated = serializer.save()
-
-        log_activity(
-            request.user,
-            ActivityLog.ENTITY_ROADMAP,
-            updated.id,
-            "UPDATED",
-            f"Cập nhật roadmap {updated.code}: {old_status} ({old_progress}%) → {updated.status} ({updated.progress_percent}%)",
-            old_value={"status": old_status, "progress": old_progress},
-            new_value={"status": updated.status, "progress": updated.progress_percent},
-        )
         notify_roadmap_updated(updated, actor=request.user, created=False)
         return Response(self.get_serializer(updated).data)
 
@@ -124,21 +101,3 @@ class RoadmapItemViewSet(viewsets.ModelViewSet):
         if denied:
             return denied
         return super().destroy(request, *args, **kwargs)
-
-    @action(detail=True, methods=["get", "post"])
-    def comments(self, request, pk=None):
-        item = self.get_object()
-        if request.method == "GET":
-            qs = item.comments.select_related("author", "author__role").all()
-            return Response(CommentSerializer(qs, many=True).data)
-
-        content = (request.data.get("content") or "").strip()
-        if not content:
-            return Response({"detail": "Nội dung bình luận không được để trống."}, status=status.HTTP_400_BAD_REQUEST)
-        comment = Comment.objects.create(
-            author=request.user,
-            roadmap_item=item,
-            content=content,
-            is_internal=True,
-        )
-        return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)

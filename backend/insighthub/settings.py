@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "apps.roadmap",
     "apps.notifications",
     "apps.core",
+    "apps.web",
 ]
 
 MIDDLEWARE = [
@@ -70,13 +71,14 @@ ROOT_URLCONF = "insighthub.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.web.context_processors.web_context",
             ],
         },
     },
@@ -87,22 +89,22 @@ ASGI_APPLICATION = "insighthub.asgi.application"
 
 IS_TESTING = "pytest" in sys.modules
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
-USE_SQLITE_FALLBACK = _env_bool("USE_SQLITE_FALLBACK", False) or (IS_TESTING and not DATABASE_URL)
+USE_SQLITE_FALLBACK = _env_bool("USE_SQLITE_FALLBACK", False) or (IS_TESTING and not _env_bool("TEST_USE_POSTGRES", False))
 
-if DATABASE_URL:
+if USE_SQLITE_FALLBACK:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+elif DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=600,
             conn_health_checks=True,
         )
-    }
-elif USE_SQLITE_FALLBACK:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
     }
 else:
     DATABASES = {
@@ -126,12 +128,22 @@ TIME_ZONE = "Asia/Ho_Chi_Minh"
 USE_I18N = True
 USE_TZ = True
 
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/dashboard/"
+LOGOUT_REDIRECT_URL = "/login/"
+
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATIC_ROOT.mkdir(parents=True, exist_ok=True)
+STATICFILES_DIRS = [BASE_DIR / "static"]
+(BASE_DIR / "static").mkdir(parents=True, exist_ok=True)
 STORAGES = {
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if (DEBUG or IS_TESTING)
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
     },
 }
 
@@ -147,9 +159,21 @@ CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
     if origin.strip()
 ]
+if RENDER_EXTERNAL_HOSTNAME:
+    render_origin = f"https://{RENDER_EXTERNAL_HOSTNAME}"
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
+    if render_origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(render_origin)
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
+if RENDER_EXTERNAL_URL and RENDER_EXTERNAL_URL not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(RENDER_EXTERNAL_URL)
 
 # REST Framework & JWT
 REST_FRAMEWORK = {

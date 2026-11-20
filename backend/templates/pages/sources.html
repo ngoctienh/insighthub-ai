@@ -1,0 +1,189 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}Multi-source Feedback Hub — InsightHub AI{% endblock %}
+{% block page_title %}Multi-source Feedback Hub{% endblock %}
+{% block page_subtitle %}Giả lập &amp; tiếp nhận phản hồi từ 4 kênh (Website Form, Email, Live Chat, Cộng đồng) vào cùng bảng feedbacks{% endblock %}
+
+{% block content %}
+<!-- Channel Tabs -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+  <a href="?tab=WEB_FORM" class="p-4 rounded-2xl border text-left transition-all {% if active_tab == 'WEB_FORM' %}bg-brand-600 text-white border-brand-600 shadow-md{% else %}bg-white text-slate-800 border-slate-200 hover:border-brand-300{% endif %}">
+    <div class="flex items-center justify-between mb-1.5">
+      <i data-lucide="globe" class="w-5 h-5"></i>
+      <span class="text-xs font-bold px-2 py-0.5 rounded-full {% if active_tab == 'WEB_FORM' %}bg-white/20 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">{{ source_counts.WEB_FORM|default:0 }}</span>
+    </div>
+    <div class="font-semibold text-sm">Website Form</div>
+  </a>
+  <a href="?tab=EMAIL" class="p-4 rounded-2xl border text-left transition-all {% if active_tab == 'EMAIL' %}bg-brand-600 text-white border-brand-600 shadow-md{% else %}bg-white text-slate-800 border-slate-200 hover:border-brand-300{% endif %}">
+    <div class="flex items-center justify-between mb-1.5">
+      <i data-lucide="mail" class="w-5 h-5"></i>
+      <span class="text-xs font-bold px-2 py-0.5 rounded-full {% if active_tab == 'EMAIL' %}bg-white/20 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">{{ source_counts.EMAIL|default:0 }}</span>
+    </div>
+    <div class="font-semibold text-sm">Email Inbox Sim</div>
+  </a>
+  <a href="?tab=LIVE_CHAT" class="p-4 rounded-2xl border text-left transition-all {% if active_tab == 'LIVE_CHAT' %}bg-brand-600 text-white border-brand-600 shadow-md{% else %}bg-white text-slate-800 border-slate-200 hover:border-brand-300{% endif %}">
+    <div class="flex items-center justify-between mb-1.5">
+      <i data-lucide="message-square" class="w-5 h-5"></i>
+      <span class="text-xs font-bold px-2 py-0.5 rounded-full {% if active_tab == 'LIVE_CHAT' %}bg-white/20 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">{{ source_counts.LIVE_CHAT|default:0 }}</span>
+    </div>
+    <div class="font-semibold text-sm">Live Chat Sim</div>
+  </a>
+  <a href="?tab=COMMUNITY" class="p-4 rounded-2xl border text-left transition-all {% if active_tab == 'COMMUNITY' %}bg-brand-600 text-white border-brand-600 shadow-md{% else %}bg-white text-slate-800 border-slate-200 hover:border-brand-300{% endif %}">
+    <div class="flex items-center justify-between mb-1.5">
+      <i data-lucide="users" class="w-5 h-5"></i>
+      <span class="text-xs font-bold px-2 py-0.5 rounded-full {% if active_tab == 'COMMUNITY' %}bg-white/20 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">{{ source_counts.COMMUNITY|default:0 }}</span>
+    </div>
+    <div class="font-semibold text-sm">Community Sim</div>
+  </a>
+</div>
+
+<div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm max-w-4xl">
+  {% if active_tab == "WEB_FORM" %}
+    <h2 class="font-bold text-slate-900 mb-4">Biểu mẫu phản hồi Website</h2>
+    <form method="post" action="{% url 'web-sources' %}" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="source_code" value="WEB_FORM" />
+      <div class="grid sm:grid-cols-3 gap-3">
+        <input type="text" name="sender_name" required placeholder="Tên khách hàng" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <input type="email" name="sender_email" required placeholder="Email khách hàng" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <select name="product_id" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-3">
+        <input type="text" name="title" required placeholder="Tiêu đề phản hồi" class="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <select name="impact_level" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+        </select>
+      </div>
+      <textarea name="content" required rows="4" placeholder="Nội dung chi tiết từ Website Form..." class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></textarea>
+      <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
+        <i data-lucide="send" class="w-4 h-4"></i>
+        Gửi qua Website Form
+      </button>
+    </form>
+  {% elif active_tab == "EMAIL" %}
+    <h2 class="font-bold text-slate-900 mb-3">Mô phỏng Hộp thư Email CSKH</h2>
+    <div class="flex flex-wrap gap-2 mb-4">
+      {% for sample in sample_emails %}
+        <button type="button" onclick="loadEmailSample({{ forloop.counter0 }})" class="px-3 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-800 text-xs font-medium hover:bg-cyan-100">
+          Nạp mẫu Email #{{ forloop.counter }}: {{ sample.subject|truncatechars:36 }}
+        </button>
+      {% endfor %}
+    </div>
+    <form method="post" action="{% url 'web-sources' %}" class="space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="source_code" value="EMAIL" />
+      <div class="grid sm:grid-cols-3 gap-3">
+        <input id="email-name" type="text" name="sender_name" required value="{{ sample_emails.0.sender_name }}" placeholder="From Name" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <input id="email-addr" type="email" name="sender_email" required value="{{ sample_emails.0.sender_email }}" placeholder="From Email" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <select name="product_id" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-3">
+        <input id="email-subject" type="text" name="title" required value="{{ sample_emails.0.subject }}" placeholder="Email Subject" class="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <select id="email-impact" name="impact_level" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="CRITICAL" selected>Critical</option>
+        </select>
+      </div>
+      <textarea id="email-content" name="content" rows="5" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-mono">{{ sample_emails.0.content }}</textarea>
+      <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-cyan-600 text-white text-sm font-semibold hover:bg-cyan-700">
+        <i data-lucide="mail" class="w-4 h-4"></i>
+        Giả lập nhận Email vào Inbox
+      </button>
+    </form>
+  {% elif active_tab == "LIVE_CHAT" %}
+    <h2 class="font-bold text-slate-900 mb-4">Mô phỏng Hội thoại Live Chat</h2>
+    <div id="chat-log" class="border border-slate-200 rounded-xl bg-slate-50 p-4 space-y-2.5 max-h-60 overflow-y-auto mb-3">
+      <div class="flex justify-start"><div class="max-w-[80%] px-3.5 py-2 rounded-2xl text-xs bg-white border border-slate-200 text-slate-800"><span class="font-bold block mb-0.5">Khách hàng</span><span class="cust-msg">Chào shop, mình vừa đặt đơn nhưng không áp dụng được mã giảm giá 30k.</span></div></div>
+      <div class="flex justify-end"><div class="max-w-[80%] px-3.5 py-2 rounded-2xl text-xs bg-emerald-600 text-white"><span class="font-bold block mb-0.5">CSKH</span>Chào bạn, bạn vui lòng cho mình biết giá trị đơn và thông báo lỗi trên màn hình nhé.</div></div>
+      <div class="flex justify-start"><div class="max-w-[80%] px-3.5 py-2 rounded-2xl text-xs bg-white border border-slate-200 text-slate-800"><span class="font-bold block mb-0.5">Khách hàng</span><span class="cust-msg">Đơn 180k vượt mức tối thiểu 120k rồi nhưng cứ bấm chọn voucher là báo lỗi không hợp lệ.</span></div></div>
+    </div>
+    <div class="flex gap-2 mb-4">
+      <input id="chat-draft" type="text" placeholder="Thêm tin nhắn giả lập của khách hàng vào đoạn chat..." class="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+      <button type="button" onclick="appendChatMsg()" class="px-3.5 py-2 rounded-lg border border-slate-300 text-xs font-semibold hover:bg-slate-50">+ Thêm tin nhắn</button>
+    </div>
+    <form id="chat-form" method="post" action="{% url 'web-sources' %}" onsubmit="syncChatContent()" class="space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="source_code" value="LIVE_CHAT" />
+      <input type="hidden" id="chat-content-hidden" name="content" value="" />
+      <div class="grid sm:grid-cols-4 gap-3">
+        <input type="text" name="sender_name" required value="Trần Bảo Ngọc" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <input type="email" name="sender_email" required value="ngoc.tran@gmail.com" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <select name="product_id" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select>
+        <select name="impact_level" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH" selected>High</option><option value="CRITICAL">Critical</option>
+        </select>
+      </div>
+      <input type="text" name="title" required value="Không áp dụng được mã giảm giá dù đơn vượt mức tối thiểu" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+      <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+        <i data-lucide="message-square" class="w-4 h-4"></i>
+        Chuyển đoạn Chat thành Feedback
+      </button>
+    </form>
+  {% else %}
+    <h2 class="font-bold text-slate-900 mb-4">Mô phỏng Bài đăng Cộng đồng Người dùng</h2>
+    <form method="post" action="{% url 'web-sources' %}" class="space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="source_code" value="COMMUNITY" />
+      <div class="grid sm:grid-cols-4 gap-3">
+        <input type="text" name="sender_name" required value="Cộng đồng FoodLover" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <input type="email" name="sender_email" required value="member.community@gmail.com" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <select name="product_id" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select>
+        <select name="impact_level" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+        </select>
+      </div>
+      <input type="text" name="title" required value="Đề xuất cho phép hẹn giờ giao cố định buổi trưa văn phòng" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+      <textarea name="content" rows="4" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">Nhóm văn phòng tụi mình hay đặt cơm trưa lúc 10h để 11h45 giao đúng giờ nghỉ trưa.</textarea>
+      <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">
+        <i data-lucide="users" class="w-4 h-4"></i>
+        Thu thập từ Cộng đồng
+      </button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const emailSamples = {{ sample_emails_json|safe }};
+  function loadEmailSample(idx) {
+    const s = emailSamples[idx];
+    if (!s) return;
+    document.getElementById("email-name").value = s.sender_name;
+    document.getElementById("email-addr").value = s.sender_email;
+    document.getElementById("email-subject").value = s.subject;
+    document.getElementById("email-content").value = s.content;
+    document.getElementById("email-impact").value = s.impact_level;
+  }
+  function appendChatMsg() {
+    const inp = document.getElementById("chat-draft");
+    const txt = (inp.value || "").trim();
+    if (!txt) return;
+    const log = document.getElementById("chat-log");
+    const row = document.createElement("div");
+    row.className = "flex justify-start";
+    const bubble = document.createElement("div");
+    bubble.className = "max-w-[80%] px-3.5 py-2 rounded-2xl text-xs bg-white border border-slate-200 text-slate-800";
+    bubble.innerHTML = '<span class="font-bold block mb-0.5">Khách hàng</span>';
+    const span = document.createElement("span");
+    span.className = "cust-msg";
+    span.textContent = txt;
+    bubble.appendChild(span);
+    row.appendChild(bubble);
+    log.appendChild(row);
+    inp.value = "";
+    log.scrollTop = log.scrollHeight;
+  }
+  function syncChatContent() {
+    const msgs = Array.from(document.querySelectorAll("#chat-log .cust-msg")).map((el) => el.textContent.trim());
+    document.getElementById("chat-content-hidden").value = msgs.join(" ");
+  }
+</script>
+{% endblock %}

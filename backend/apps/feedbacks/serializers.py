@@ -9,7 +9,6 @@ from .models import Feedback, FeedbackSource, FeedbackTag, Product, Tag
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    owner_detail = UserMinimalSerializer(source="owner", read_only=True)
     feedback_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
@@ -19,15 +18,11 @@ class ProductSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "description",
-            "category",
-            "owner",
-            "owner_detail",
             "is_active",
             "feedback_count",
             "created_at",
-            "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at"]
 
     def validate_slug(self, value: str) -> str:
         return slugify(value)
@@ -42,30 +37,20 @@ class FeedbackSourceSerializer(serializers.ModelSerializer):
             "id",
             "code",
             "name",
-            "channel_type",
-            "description",
-            "webhook_token",
             "is_active",
             "feedback_count",
-            "created_at",
         ]
-        read_only_fields = ["id", "code", "created_at"]
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
-        role_code = getattr(user, "role_code", "") if user and user.is_authenticated else ""
-        if role_code not in (Role.ADMIN, Role.PRODUCT_MANAGER):
-            data.pop("webhook_token", None)
-        return data
+        read_only_fields = ["id", "code"]
 
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
-        fields = ["id", "name", "slug", "color", "description", "created_at"]
-        read_only_fields = ["id", "created_at"]
+        fields = ["id", "name", "slug", "color"]
+        read_only_fields = ["id"]
+
+    def validate_slug(self, value: str) -> str:
+        return slugify(value)
 
 
 class RelatedInsightBriefSerializer(serializers.ModelSerializer):
@@ -89,7 +74,6 @@ class FeedbackListSerializer(serializers.ModelSerializer):
     related_insights = RelatedInsightBriefSerializer(source="insight_groups", many=True, read_only=True)
     votes_count = serializers.SerializerMethodField()
     user_has_voted = serializers.SerializerMethodField()
-    comments_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Feedback
@@ -98,6 +82,7 @@ class FeedbackListSerializer(serializers.ModelSerializer):
             "code",
             "title",
             "content",
+            "ai_summary",
             "sender_name",
             "sender_email",
             "author",
@@ -118,8 +103,6 @@ class FeedbackListSerializer(serializers.ModelSerializer):
             "related_insights",
             "votes_count",
             "user_has_voted",
-            "comments_count",
-            "submitted_at",
             "created_at",
             "updated_at",
         ]
@@ -138,14 +121,6 @@ class FeedbackListSerializer(serializers.ModelSerializer):
             return obj.prefetched_user_voted
         return Vote.objects.filter(user=user, feedback=obj).exists()
 
-    def get_comments_count(self, obj: Feedback) -> int:
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
-        qs = obj.comments.all()
-        if user and user.is_authenticated and user.role_code == Role.CUSTOMER:
-            qs = qs.filter(is_internal=False)
-        return qs.count()
-
 
 class FeedbackDetailSerializer(FeedbackListSerializer):
     duplicate_of_detail = DuplicateSummarySerializer(source="duplicate_of", read_only=True)
@@ -153,10 +128,6 @@ class FeedbackDetailSerializer(FeedbackListSerializer):
 
     class Meta(FeedbackListSerializer.Meta):
         fields = FeedbackListSerializer.Meta.fields + [
-            "normalized_content",
-            "embedding_model",
-            "external_reference_id",
-            "source_metadata",
             "duplicate_of_detail",
             "author_detail",
         ]
@@ -180,13 +151,12 @@ class FeedbackWriteSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "content",
+            "ai_summary",
             "sender_name",
             "sender_email",
             "product",
             "source",
             "source_code",
-            "external_reference_id",
-            "source_metadata",
             "status",
             "impact_level",
             "priority_score",
@@ -197,6 +167,7 @@ class FeedbackWriteSerializer(serializers.ModelSerializer):
             "source": {"required": False},
             "sender_name": {"required": False},
             "sender_email": {"required": False},
+            "ai_summary": {"required": False},
         }
 
     def validate(self, attrs):
@@ -216,7 +187,7 @@ class FeedbackWriteSerializer(serializers.ModelSerializer):
         if not validated_data.get("source"):
             web_source, _ = FeedbackSource.objects.get_or_create(
                 code=FeedbackSource.WEB_FORM,
-                defaults={"name": "Website Form", "channel_type": "WEB"},
+                defaults={"name": "Website Form"},
             )
             validated_data["source"] = web_source
 
@@ -230,25 +201,20 @@ class FeedbackWriteSerializer(serializers.ModelSerializer):
                 validated_data.pop("priority_score", None)
             else:
                 validated_data.setdefault("author", user)
-                validated_data.setdefault("sender_name", user.display_name())
-                validated_data.setdefault("sender_email", user.email)
+                if not (validated_data.get("sender_name") or "").strip():
+                    validated_data["sender_name"] = user.display_name()
+                if not (validated_data.get("sender_email") or "").strip():
+                    validated_data["sender_email"] = user.email
 
         feedback = Feedback.objects.create(**validated_data)
         if tag_ids:
-            valid_tags = Tag.objects.filter(id__in=tag_ids)
-            for tag in valid_tags:
-                FeedbackTag.objects.get_or_create(
-                    feedback=feedback,
-                    tag=tag,
-                    defaults={"added_by": user if (user and user.is_authenticated) else None},
-                )
+            for tag in Tag.objects.filter(id__in=tag_ids):
+                FeedbackTag.objects.get_or_create(feedback=feedback, tag=tag)
         return feedback
 
     def update(self, instance, validated_data):
         tag_ids = validated_data.pop("tag_ids", None)
         validated_data.pop("source_code", None)
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -257,11 +223,7 @@ class FeedbackWriteSerializer(serializers.ModelSerializer):
         if tag_ids is not None:
             FeedbackTag.objects.filter(feedback=instance).exclude(tag_id__in=tag_ids).delete()
             for tag in Tag.objects.filter(id__in=tag_ids):
-                FeedbackTag.objects.get_or_create(
-                    feedback=instance,
-                    tag=tag,
-                    defaults={"added_by": user if (user and user.is_authenticated) else None},
-                )
+                FeedbackTag.objects.get_or_create(feedback=instance, tag=tag)
         return instance
 
 
@@ -276,6 +238,4 @@ class MultiSourceIngestSerializer(serializers.Serializer):
         choices=Feedback.IMPACT_CHOICES,
         default=Feedback.IMPACT_MEDIUM,
     )
-    external_reference_id = serializers.CharField(max_length=150, required=False, allow_blank=True)
-    source_metadata = serializers.JSONField(required=False, default=dict)
     tag_ids = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)

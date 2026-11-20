@@ -30,7 +30,6 @@ class RoadmapItem(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     public_description = models.TextField(blank=True, default="")
-    internal_notes = models.TextField(blank=True, default="")
 
     status = models.CharField(
         max_length=24,
@@ -45,8 +44,6 @@ class RoadmapItem(models.Model):
         db_index=True,
     )
     quarter = models.CharField(max_length=32, blank=True, default="Q4 2026")
-    target_start_date = models.DateField(null=True, blank=True)
-    target_end_date = models.DateField(null=True, blank=True)
     progress_percent = models.PositiveSmallIntegerField(default=0)
 
     owner = models.ForeignKey(
@@ -56,13 +53,6 @@ class RoadmapItem(models.Model):
         blank=True,
         related_name="owned_roadmap_items",
     )
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="created_roadmap_items",
-    )
     insight_groups = models.ManyToManyField(
         "insights.InsightGroup",
         through="RoadmapItemInsight",
@@ -70,7 +60,6 @@ class RoadmapItem(models.Model):
         blank=True,
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -102,7 +91,6 @@ class RoadmapItemInsight(models.Model):
         on_delete=models.CASCADE,
         related_name="insight_roadmap_links",
     )
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "roadmap_item_insights"

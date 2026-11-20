@@ -1,33 +1,24 @@
-import hashlib
-import logging
-import secrets
-from datetime import timedelta
-
-from django.conf import settings
+from django.db.models import Count
 from django.utils import timezone
-from rest_framework import generics, permissions, status, viewsets
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import PasswordResetToken, Role, User
+from .models import Role, User
 from .permissions import IsAdmin, UserManagementPermission
 from .serializers import (
     AdminUserWriteSerializer,
     ChangePasswordSerializer,
-    ForgotPasswordSerializer,
     LoginSerializer,
     ProfileUpdateSerializer,
     RegisterSerializer,
-    ResetPasswordSerializer,
     RoleSerializer,
     UserDetailSerializer,
     UserMinimalSerializer,
     ensure_default_roles,
 )
-
-logger = logging.getLogger(__name__)
 
 
 def _issue_tokens_for_user(user: User) -> dict:
@@ -104,70 +95,37 @@ class ChangePasswordView(APIView):
         return Response({"detail": "Đổi mật khẩu thành công."})
 
 
-class ForgotPasswordView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        serializer = ForgotPasswordSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data["email"].strip().lower()
-        user = User.objects.filter(email__iexact=email, is_active=True).first()
-
-        response_payload = {
-            "detail": "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được tạo.",
-        }
-
-        if user:
-            raw_token = secrets.token_urlsafe(32)
-            token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
-            PasswordResetToken.objects.create(
-                user=user,
-                token_hash=token_hash,
-                expires_at=timezone.now() + timedelta(minutes=30),
-            )
-            logger.info("Password reset token generated for user_id=%s", user.id)
-            if settings.DEBUG:
-                response_payload["dev_reset_token"] = raw_token
-
-        return Response(response_payload, status=status.HTTP_200_OK)
-
-
-class ResetPasswordView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        serializer = ResetPasswordSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        raw_token = serializer.validated_data["token"].strip()
-        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
-
-        record = (
-            PasswordResetToken.objects.select_related("user")
-            .filter(token_hash=token_hash, used_at__isnull=True, expires_at__gt=timezone.now())
-            .first()
-        )
-        if not record:
-            return Response(
-                {"detail": "Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user = record.user
-        user.set_password(serializer.validated_data["new_password"])
-        user.save(update_fields=["password"])
-        record.used_at = timezone.now()
-        record.save(update_fields=["used_at"])
-        return Response({"detail": "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập ngay."})
-
-
-class RoleListView(generics.ListAPIView):
+class RoleViewSet(viewsets.ModelViewSet):
     serializer_class = RoleSerializer
-    permission_classes = [permissions.IsAuthenticated]
     pagination_class = None
+    http_method_names = ["get", "patch", "put", "post", "head", "options"]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve", "features"):
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), IsAdmin()]
 
     def get_queryset(self):
         ensure_default_roles()
-        return Role.objects.all()
+        return Role.objects.annotate(user_count=Count("users")).order_by("id")
+
+    @action(detail=False, methods=["get"])
+    def features(self, request):
+        return Response(
+            [
+                {"key": key, "label": label, "description": desc}
+                for key, label, desc in Role.FEATURE_MODULES
+            ]
+        )
+
+    @action(detail=False, methods=["post"])
+    def reset_defaults(self, request):
+        ensure_default_roles()
+        for role in Role.objects.all():
+            role.permissions = list(Role.DEFAULT_PERMISSIONS.get(role.code, []))
+            role.save(update_fields=["permissions"])
+        serializer = self.get_serializer(self.get_queryset(), many=True)
+        return Response(serializer.data)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -184,9 +142,11 @@ class UserViewSet(viewsets.ModelViewSet):
         if internal_only in ("1", "true", "True"):
             qs = qs.exclude(role__code=Role.CUSTOMER)
         if search:
-            qs = qs.filter(
-                full_name__icontains=search
-            ) | qs.filter(email__icontains=search) | qs.filter(username__icontains=search)
+            qs = (
+                qs.filter(full_name__icontains=search)
+                | qs.filter(email__icontains=search)
+                | qs.filter(username__icontains=search)
+            )
         return qs.distinct()
 
     def get_serializer_class(self):

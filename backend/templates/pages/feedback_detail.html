@@ -1,0 +1,237 @@
+{% extends "layouts/app.html" %}
+{% load web_tags %}
+
+{% block title %}{{ fb.code }} — InsightHub AI{% endblock %}
+{% block page_title %}{{ fb.code }} — {{ fb.title }}{% endblock %}
+{% block page_subtitle %}Sản phẩm: {{ fb.product.name }} · Gửi lúc {{ fb.created_at|date:"H:i d/m/Y" }}{% endblock %}
+{% block page_actions %}
+  <a href="{% url 'web-inbox' %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm font-medium hover:bg-slate-50">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+    Quay lại
+  </a>
+  <form method="post" action="{% url 'web-feedback-detail' fb.id %}" class="inline">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="vote" />
+    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-semibold {% if fb.user_has_voted %}bg-brand-50 border-brand-300 text-brand-700{% else %}bg-white border-slate-300 text-slate-700{% endif %}">
+      <i data-lucide="thumbs-up" class="w-4 h-4"></i>
+      Vote ({{ fb.votes_total }})
+    </button>
+  </form>
+{% endblock %}
+
+{% block content %}
+<div class="grid lg:grid-cols-3 gap-6">
+  <!-- Main Column -->
+  <div class="lg:col-span-2 space-y-6">
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex flex-wrap items-center gap-2 mb-4">
+        {% source_badge fb.source.code %}
+        {% status_badge fb.status %}
+        {% priority_badge fb.impact_level fb.priority_score %}
+        {% if fb.is_duplicate_confirmed %}
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 border border-zinc-300 text-xs font-semibold text-zinc-700">
+            <i data-lucide="copy" class="w-3 h-3"></i>
+            Đã xác nhận trùng lặp
+          </span>
+        {% endif %}
+      </div>
+
+      <p class="text-slate-800 whitespace-pre-line leading-relaxed text-[15px]">{{ fb.content }}</p>
+
+      {% if not is_internal and fb.author_id == user.id and fb.status == "NEW" %}
+        <details class="mt-4 pt-4 border-t border-slate-100">
+          <summary class="text-xs font-semibold text-brand-600 cursor-pointer hover:underline">Chỉnh sửa nội dung phản hồi của tôi</summary>
+          <form method="post" action="{% url 'web-feedback-detail' fb.id %}" class="mt-3 space-y-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit_customer_feedback" />
+            <input type="text" name="title" required value="{{ fb.title }}" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+            <textarea name="content" rows="3" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">{{ fb.content }}</textarea>
+            <select name="impact_level" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+              <option value="LOW" {% if fb.impact_level == "LOW" %}selected{% endif %}>Low</option>
+              <option value="MEDIUM" {% if fb.impact_level == "MEDIUM" %}selected{% endif %}>Medium</option>
+              <option value="HIGH" {% if fb.impact_level == "HIGH" %}selected{% endif %}>High</option>
+              <option value="CRITICAL" {% if fb.impact_level == "CRITICAL" %}selected{% endif %}>Critical</option>
+            </select>
+            <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-xs font-semibold">Lưu chỉnh sửa</button>
+          </form>
+        </details>
+      {% endif %}
+
+      <!-- AI Summary Box -->
+      <div class="mt-5 p-4 rounded-xl bg-indigo-50/70 border border-indigo-200">
+        <div class="flex items-center justify-between gap-2 mb-1.5">
+          <span class="text-xs font-bold uppercase text-indigo-900 flex items-center gap-1.5">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-600"></i>
+            Tóm tắt bằng AI
+          </span>
+          {% if is_internal %}
+            <form method="post" action="{% url 'web-feedback-detail' fb.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="summarize" />
+              <button type="submit" class="px-2.5 py-1 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700">
+                {% if fb.ai_summary %}Tạo lại tóm tắt{% else %}Tóm tắt AI{% endif %}
+              </button>
+            </form>
+          {% endif %}
+        </div>
+        <p class="text-sm text-indigo-950">{{ fb.ai_summary|default:"Chưa có tóm tắt AI cho feedback này." }}</p>
+      </div>
+
+      {% if fb.duplicate_of %}
+        <div class="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between text-xs gap-3">
+          <div>
+            Liên kết trùng lặp với
+            <a href="{% url 'web-feedback-detail' fb.duplicate_of.id %}" class="font-bold text-amber-900 underline">
+              {{ fb.duplicate_of.code }}: {{ fb.duplicate_of.title }}
+            </a>
+            {% if fb.similarity_score %}(Cosine = {{ fb.similarity_score|mul100 }}%){% endif %}
+          </div>
+          {% if is_internal %}
+            <form method="post" action="{% url 'web-feedback-detail' fb.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="unmark_duplicate" />
+              <button type="submit" class="px-2.5 py-1 rounded bg-white border border-amber-300 font-medium text-amber-900">
+                Gỡ trùng lặp
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    {% if is_internal %}
+      <!-- AI Similarity Search -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="sparkles" class="w-4 h-4 text-brand-600"></i>
+              Kiểm tra Feedback tương tự (AI Cosine Similarity)
+            </h2>
+            <p class="text-xs text-slate-500">So sánh vector để phát hiện các phản hồi gần giống trước khi xác nhận trùng lặp</p>
+          </div>
+          <form method="post" action="{% url 'web-feedback-detail' fb.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="find_similar" />
+            <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700">
+              Quét tương đồng AI
+            </button>
+          </form>
+        </div>
+
+        {% if similar_matches %}
+          <div class="space-y-2">
+            {% for m in similar_matches %}
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50">
+                <div>
+                  <a href="{% url 'web-feedback-detail' m.feedback_id %}" class="text-sm font-semibold text-slate-900 hover:text-brand-600">
+                    {{ m.code }}: {{ m.title }}
+                  </a>
+                  <div class="text-xs text-slate-500 mt-0.5">
+                    Cosine Similarity: <strong>{{ m.similarity_score|mul100 }}%</strong>
+                    {% if m.is_exact_normalized_match %} · Trùng khớp văn bản chuẩn hóa{% endif %}
+                  </div>
+                </div>
+                {% if can_assign %}
+                  <form method="post" action="{% url 'web-feedback-detail' fb.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="mark_duplicate" />
+                    <input type="hidden" name="duplicate_of_id" value="{{ m.feedback_id }}" />
+                    <input type="hidden" name="similarity_score" value="{{ m.similarity_score }}" />
+                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-medium hover:bg-slate-100 shrink-0">
+                      Xác nhận trùng lặp
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% elif similarity_ran %}
+          <p class="text-xs text-slate-500">Không tìm thấy phản hồi tương tự vượt ngưỡng.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Right Sidebar -->
+  <div class="space-y-6">
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+      <h3 class="font-bold text-slate-900 text-sm">Thông tin xử lý</h3>
+      <div>
+        <div class="text-xs text-slate-500">Người gửi</div>
+        <div class="text-sm font-semibold text-slate-900">{{ fb.sender_name }}</div>
+        <div class="text-xs text-slate-500">{{ fb.sender_email }}</div>
+      </div>
+
+      {% if is_internal %}
+        <div>
+          <label class="block text-xs text-slate-500 mb-1.5">Chuyển trạng thái nhanh</label>
+          <div class="grid grid-cols-2 gap-1.5">
+            {% for val, lbl in kanban_statuses %}
+              <form method="post" action="{% url 'web-feedback-detail' fb.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_status" />
+                <input type="hidden" name="status" value="{{ val }}" />
+                <button type="submit" class="w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors {% if fb.status == val %}bg-slate-900 text-white border-slate-900{% else %}bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100{% endif %}">
+                  {{ lbl }}
+                </button>
+              </form>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if can_assign %}
+          <form method="post" action="{% url 'web-feedback-detail' fb.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="assign" />
+            <label class="block text-xs text-slate-500 mb-1 flex items-center gap-1">
+              <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+              Người phụ trách
+            </label>
+            <select name="assigned_to" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+              <option value="">-- Chưa phân công --</option>
+              {% for u in staff %}
+                <option value="{{ u.id }}" {% if fb.assigned_to_id == u.id %}selected{% endif %}>
+                  {{ u.display_name }} ({% if u.role %}{{ u.role.name }}{% else %}{{ u.role_code }}{% endif %})
+                </option>
+              {% endfor %}
+            </select>
+          </form>
+        {% endif %}
+
+        <div>
+          <label class="block text-xs text-slate-500 mb-1.5 flex items-center gap-1">
+            <i data-lucide="tag" class="w-3.5 h-3.5"></i>
+            Nhãn phân loại
+          </label>
+          <div class="flex flex-wrap gap-1.5">
+            {% for t in all_tags %}
+              <form method="post" action="{% url 'web-feedback-detail' fb.id %}" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_tag" />
+                <input type="hidden" name="tag_id" value="{{ t.id }}" />
+                <button type="submit" class="px-2.5 py-1 rounded-md text-xs font-medium border transition-colors {% if t.id in fb_tag_ids %}bg-brand-600 text-white border-brand-600{% else %}bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100{% endif %}">
+                  {{ t.name }}
+                </button>
+              </form>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if fb.insight_groups.all %}
+        <div>
+          <div class="text-xs text-slate-500 mb-1.5">Nhóm Insight liên quan</div>
+          <div class="space-y-1.5">
+            {% for ins in fb.insight_groups.all %}
+              <a href="{% if is_internal and user|has_perm:'insights' %}{% url 'web-insight-detail' ins.id %}{% else %}#{% endif %}" class="block p-2.5 rounded-lg bg-indigo-50/60 border border-indigo-200 text-xs font-semibold text-indigo-900 hover:bg-indigo-50">
+                {{ ins.code }} · {{ ins.title }}
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

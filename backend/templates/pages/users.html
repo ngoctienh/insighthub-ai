@@ -1,0 +1,256 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}Người dùng & Phân quyền — InsightHub AI{% endblock %}
+{% block page_title %}Quản lý Người dùng &amp; Phân quyền{% endblock %}
+{% block page_subtitle %}{% if is_admin %}Quản trị tài khoản, gán vai trò và bật/tắt quyền sử dụng từng chức năng{% else %}Danh bạ thành viên và bảng phân quyền chức năng theo vai trò (Chỉ Admin có quyền sửa){% endif %}{% endblock %}
+{% block page_actions %}
+  {% if is_admin %}
+    <button type="button" onclick="openUserCreate()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
+      <i data-lucide="plus" class="w-4 h-4"></i>Tạo người dùng
+    </button>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Users Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-sm">
+        <thead>
+          <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
+            <th class="py-3 px-4">Thành viên</th>
+            <th class="py-3 px-4">Vai trò (Role)</th>
+            <th class="py-3 px-4">Chức danh</th>
+            <th class="py-3 px-4">Trạng thái</th>
+            {% if is_admin %}<th class="py-3 px-4 text-right">Thao tác</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for u in users_list %}
+            <tr class="hover:bg-slate-50">
+              <td class="py-3 px-4">
+                <div class="font-semibold text-slate-900">{{ u.display_name }}</div>
+                <div class="text-xs text-slate-500">@{{ u.username }} · {{ u.email }}</div>
+              </td>
+              <td class="py-3 px-4">
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-semibold">
+                  <i data-lucide="shield" class="w-3 h-3"></i>
+                  {% if u.role %}{{ u.role.name }}{% else %}{{ u.role_code }}{% endif %}
+                </span>
+              </td>
+              <td class="py-3 px-4 text-xs text-slate-600">{{ u.job_title|default:"—" }}</td>
+              <td class="py-3 px-4">
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold {% if u.is_active %}bg-emerald-50 text-emerald-700{% else %}bg-rose-50 text-rose-700{% endif %}">
+                  {% if u.is_active %}Hoạt động{% else %}Tạm khóa{% endif %}
+                </span>
+              </td>
+              {% if is_admin %}
+                <td class="py-3 px-4 text-right">
+                  <div class="inline-flex items-center gap-2">
+                    <button
+                      type="button"
+                      onclick="openUserEdit('{{ u.id }}', '{{ u.username|escapejs }}', '{{ u.full_name|escapejs }}', '{{ u.email|escapejs }}', '{{ u.role_code|escapejs }}', '{{ u.job_title|escapejs }}')"
+                      class="px-2.5 py-1 rounded border border-slate-300 text-xs font-medium hover:bg-slate-100"
+                    >
+                      Phân quyền / Sửa
+                    </button>
+                    <form method="post" action="{% url 'web-users' %}" class="inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_active" />
+                      <input type="hidden" name="user_id" value="{{ u.id }}" />
+                      <button type="submit" class="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-100" title="{% if u.is_active %}Vô hiệu hóa{% else %}Kích hoạt{% endif %}">
+                        {% if u.is_active %}
+                          <i data-lucide="user-x" class="w-4 h-4 text-rose-600"></i>
+                        {% else %}
+                          <i data-lucide="user-check" class="w-4 h-4 text-emerald-600"></i>
+                        {% endif %}
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Role Functional Permission Checkboxes -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="lock" class="w-4 h-4 text-brand-600"></i>
+          Cấp quyền hiển thị chức năng theo Vai trò
+        </h2>
+        <p class="text-xs text-slate-500 mt-0.5">
+          {% if is_admin %}
+            Tick chọn để cho phép vai trò nhìn thấy và sử dụng chức năng; thay đổi được lưu vào PostgreSQL/DB và đồng bộ ngay.
+          {% else %}
+            Bảng quyền sử dụng các chức năng hiện tại theo từng vai trò (Chỉ Admin được chỉnh sửa).
+          {% endif %}
+        </p>
+      </div>
+      {% if is_admin %}
+        <form method="post" action="{% url 'web-users' %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="reset_defaults" />
+          <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+            Khôi phục mặc định
+          </button>
+        </form>
+      {% endif %}
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-sm">
+        <thead>
+          <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
+            <th class="py-3 px-4 min-w-[240px]">Chức năng</th>
+            {% for rr in role_rows %}
+              <th class="py-3 px-3 text-center min-w-[125px]">
+                <div class="text-slate-900">{{ rr.role.name }}</div>
+                <div class="text-[11px] font-normal text-slate-400">{{ rr.role.user_count|default:0 }} tài khoản</div>
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for feat in features %}
+            <tr class="hover:bg-slate-50/70">
+              <td class="py-3 px-4">
+                <div class="font-semibold text-slate-900 text-sm">{{ feat.label }}</div>
+                <div class="text-xs text-slate-500">{{ feat.description }}</div>
+              </td>
+              {% for rr in role_rows %}
+                <td class="py-3 px-3 text-center">
+                  <label class="inline-flex items-center justify-center p-1.5 rounded-lg {% if not is_admin or rr.role.code == 'ADMIN' %}cursor-not-allowed opacity-70{% else %}cursor-pointer hover:bg-indigo-50{% endif %}">
+                    <input
+                      type="checkbox"
+                      {% if feat.key in rr.permissions %}checked{% endif %}
+                      {% if not is_admin or rr.role.code == "ADMIN" %}disabled{% endif %}
+                      onchange="toggleRolePerm(this, {{ rr.role.id }}, '{{ rr.role.name|escapejs }}', '{{ feat.key }}', '{{ feat.label|escapejs }}')"
+                      class="w-4 h-4 rounded border-slate-300 accent-brand-600 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                  </label>
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if is_admin %}
+  <div id="user-modal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 id="usr-modal-title" class="text-lg font-bold text-slate-900">Tạo người dùng mới</h3>
+        <button type="button" onclick="window.toggleModal('user-modal', false)" class="text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form method="post" action="{% url 'web-users' %}" class="space-y-3">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="usr-action" value="create_user" />
+        <input type="hidden" name="user_id" id="usr-id" value="" />
+        <input type="text" name="username" id="usr-username" required placeholder="Username" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm disabled:bg-slate-100" />
+        <input type="text" name="full_name" id="usr-full-name" required placeholder="Họ và tên" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <input type="email" name="email" id="usr-email" required placeholder="Email" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <select name="role_code" id="usr-role" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          {% for code, label in role_choices %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+        </select>
+        <input type="text" name="job_title" id="usr-job" placeholder="Chức danh (VD: Product Manager, Dev...)" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <input type="password" name="password" id="usr-password" minlength="8" placeholder="Mật khẩu (tối thiểu 8 ký tự)" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="window.toggleModal('user-modal', false)" class="px-4 py-2 rounded-lg border border-slate-300 text-sm">Hủy</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold">Lưu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function openUserCreate() {
+    document.getElementById("usr-modal-title").textContent = "Tạo người dùng mới";
+    document.getElementById("usr-action").value = "create_user";
+    document.getElementById("usr-id").value = "";
+    const uInp = document.getElementById("usr-username");
+    uInp.value = "";
+    uInp.disabled = false;
+    document.getElementById("usr-full-name").value = "";
+    document.getElementById("usr-email").value = "";
+    document.getElementById("usr-role").value = "DEVELOPER";
+    document.getElementById("usr-job").value = "";
+    const pInp = document.getElementById("usr-password");
+    pInp.value = "";
+    pInp.required = true;
+    pInp.placeholder = "Mật khẩu (tối thiểu 8 ký tự)";
+    window.toggleModal("user-modal", true);
+  }
+
+  function openUserEdit(id, username, fullName, email, roleCode, jobTitle) {
+    document.getElementById("usr-modal-title").textContent = "Chỉnh sửa @" + username;
+    document.getElementById("usr-action").value = "edit_user";
+    document.getElementById("usr-id").value = id;
+    const uInp = document.getElementById("usr-username");
+    uInp.value = username;
+    uInp.disabled = true;
+    document.getElementById("usr-full-name").value = fullName;
+    document.getElementById("usr-email").value = email;
+    document.getElementById("usr-role").value = roleCode;
+    document.getElementById("usr-job").value = jobTitle;
+    const pInp = document.getElementById("usr-password");
+    pInp.value = "";
+    pInp.required = false;
+    pInp.placeholder = "Mật khẩu mới (để trống nếu giữ nguyên)";
+    window.toggleModal("user-modal", true);
+  }
+
+  async function toggleRolePerm(checkbox, roleId, roleName, featureKey, featureLabel) {
+    const enabled = checkbox.checked;
+    checkbox.disabled = true;
+    try {
+      const res = await fetch("/users/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-CSRFToken": window.getCsrfToken(),
+        },
+        body: JSON.stringify({
+          action: "toggle_permission",
+          role_id: roleId,
+          feature_key: featureKey,
+          enabled: enabled,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        checkbox.checked = !enabled;
+        window.showToast(data.detail || "Không thể cập nhật quyền.", "error");
+      } else {
+        window.showToast(
+          enabled
+            ? 'Đã cấp quyền "' + featureLabel + '" cho vai trò ' + roleName + "."
+            : 'Đã ẩn chức năng "' + featureLabel + '" với vai trò ' + roleName + ".",
+          "success"
+        );
+      }
+    } catch (err) {
+      checkbox.checked = !enabled;
+      window.showToast("Lỗi kết nối máy chủ.", "error");
+    } finally {
+      checkbox.disabled = false;
+    }
+  }
+</script>
+{% endblock %}

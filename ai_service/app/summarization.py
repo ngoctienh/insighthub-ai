@@ -185,12 +185,20 @@ def _local_summarize(
         else feedbacks
     )
     snippets = [clean_text(fb.title) for fb in ordered[:3] if clean_text(fb.title)]
-    summary = (
-        f"Nhóm gồm {len(feedbacks)} phản hồi tương đồng (chủ yếu qua {analysis['top_source']}), "
-        f"tập trung vào vấn đề: {'; '.join(snippets)}."
-    )
-    if phrases:
-        summary += f" Cụm từ nổi bật ghi nhận từ người dùng: {', '.join(phrases)}."
+    if len(feedbacks) == 1:
+        fb = feedbacks[0]
+        clean_content = clean_text(fb.content)
+        short_content = clean_content[:180] + ("..." if len(clean_content) > 180 else "")
+        summary = f"[{fb.impact_level}] {clean_text(fb.title)} — {short_content}"
+        if phrases:
+            summary += f" (Từ khóa: {', '.join(phrases)})"
+    else:
+        summary = (
+            f"Nhóm gồm {len(feedbacks)} phản hồi tương đồng (chủ yếu qua {analysis['top_source']}), "
+            f"tập trung vào vấn đề: {'; '.join(snippets)}."
+        )
+        if phrases:
+            summary += f" Cụm từ nổi bật ghi nhận từ người dùng: {', '.join(phrases)}."
 
     draft_reply = build_local_draft_reply(title, summary, tone="empathetic")
 

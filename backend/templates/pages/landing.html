@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="min-h-screen bg-white text-slate-900">
+  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <a href="{% url 'web-landing' %}" class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center shadow-sm">
+          <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+        </div>
+        <span class="font-bold text-lg tracking-tight">InsightHub AI</span>
+      </a>
+      <div class="flex items-center gap-3">
+        <a href="{% url 'web-public-roadmap' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-2">
+          Public Roadmap
+        </a>
+        {% if user.is_authenticated %}
+          <a href="{{ home_url }}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
+            Vào ứng dụng
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </a>
+        {% else %}
+          <a href="{% url 'web-login' %}" class="text-sm font-medium text-slate-700 hover:text-slate-900 px-3 py-2">
+            Đăng nhập
+          </a>
+          <a href="{% url 'web-register' %}" class="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">
+            Đăng ký miễn phí
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <section class="relative overflow-hidden bg-gradient-to-b from-indigo-50/70 via-white to-white pt-16 pb-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold mb-6">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+        AI-powered Product Discovery & Feedback Management SaaS (Django + FastAPI)
+      </div>
+      <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight max-w-4xl mx-auto leading-[1.12]">
+        Biến hàng ngàn feedback rời rạc thành
+        <span class="text-brand-600">Product Roadmap</span> có căn cứ
+      </h1>
+      <p class="mt-6 text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+        InsightHub AI tự động hợp nhất phản hồi từ Web Form, Email, Live Chat &amp; Cộng đồng,
+        dùng Vector Embedding + Cosine Similarity + DBSCAN để gom nhóm Insight, chấm điểm ưu tiên
+        <code class="px-1.5 py-0.5 rounded bg-slate-100 text-sm font-mono">0.4V + 0.35I + 0.25S</code>
+        và kết nối trực tiếp tới Kanban &amp; Roadmap.
+      </p>
+      <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+        <a
+          href="{% if user.is_authenticated %}{{ home_url }}{% else %}{% url 'web-login' %}{% endif %}"
+          class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700 shadow-lg shadow-brand-600/20"
+        >
+          Trải nghiệm ngay
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </a>
+        <a
+          href="{% url 'web-public-roadmap' %}"
+          class="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50"
+        >
+          <i data-lucide="globe" class="w-4 h-4 text-brand-600"></i>
+          Xem Public Roadmap
+        </a>
+      </div>
+
+      <div class="mt-14 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+        <div class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm text-left">
+          <i data-lucide="globe" class="w-5 h-5 text-brand-600 mb-2"></i>
+          <div class="font-semibold text-sm text-slate-900">Website Form</div>
+          <div class="text-xs text-slate-500 mt-0.5">Cổng phản hồi khách hàng</div>
+        </div>
+        <div class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm text-left">
+          <i data-lucide="mail" class="w-5 h-5 text-brand-600 mb-2"></i>
+          <div class="font-semibold text-sm text-slate-900">Email Support</div>
+          <div class="text-xs text-slate-500 mt-0.5">Đồng bộ hòm thư CSKH</div>
+        </div>
+        <div class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm text-left">
+          <i data-lucide="message-square" class="w-5 h-5 text-brand-600 mb-2"></i>
+          <div class="font-semibold text-sm text-slate-900">Live Chat</div>
+          <div class="text-xs text-slate-500 mt-0.5">Trích xuất từ hội thoại</div>
+        </div>
+        <div class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm text-left">
+          <i data-lucide="users" class="w-5 h-5 text-brand-600 mb-2"></i>
+          <div class="font-semibold text-sm text-slate-900">Community</div>
+          <div class="text-xs text-slate-500 mt-0.5">Ý kiến &amp; vote cộng đồng</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="py-16 border-t border-slate-100 bg-slate-50/70">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <div class="text-center max-w-2xl mx-auto mb-12">
+        <h2 class="text-3xl font-bold text-slate-900">Quy trình Product Discovery khép kín</h2>
+        <p class="text-slate-600 mt-2">
+          Không chỉ là chatbot — nền tảng dữ liệu thực tế cho Product Manager, CS, Dev và Khách hàng.
+        </p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4">
+            <i data-lucide="layers" class="w-5 h-5"></i>
+          </div>
+          <h3 class="font-bold text-lg text-slate-900">1. AI Similarity &amp; Clustering</h3>
+          <p class="text-sm text-slate-600 mt-2 leading-relaxed">
+            Tiền xử lý tiếng Việt, tạo Embedding, tính Cosine Similarity phát hiện trùng lặp để PM kiểm duyệt và chạy DBSCAN gom cụm Insight.
+          </p>
+        </div>
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4">
+            <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+          </div>
+          <h3 class="font-bold text-lg text-slate-900">2. Tóm tắt &amp; Chấm điểm Ưu tiên</h3>
+          <p class="text-sm text-slate-600 mt-2 leading-relaxed">
+            Tóm tắt vấn đề có kiểm chứng, đề xuất hướng xử lý, tạo nháp phản hồi khách hàng và tính điểm Priority = 0.4V + 0.35I + 0.25S.
+          </p>
+        </div>
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4">
+            <i data-lucide="kanban" class="w-5 h-5"></i>
+          </div>
+          <h3 class="font-bold text-lg text-slate-900">3. Kanban, Roadmap &amp; Thông báo</h3>
+          <p class="text-sm text-slate-600 mt-2 leading-relaxed">
+            Cập nhật trạng thái qua 4 cột Kanban (New, Reviewing, Planned, Done), phát hành Public/Private Roadmap và gửi thông báo tới người dùng.
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-10 bg-white rounded-2xl border border-slate-200 p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-start gap-3">
+          <i data-lucide="shield-check" class="w-6 h-6 text-emerald-600 shrink-0 mt-0.5"></i>
+          <div>
+            <div class="font-semibold text-slate-900">
+              Phân quyền RBAC chặt chẽ ở tầng Backend Django &amp; PostgreSQL
+            </div>
+            <div class="text-sm text-slate-600">
+              Hỗ trợ đầy đủ 5 vai trò: Admin, Product Manager, Developer, Customer Support và Customer.
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-slate-500">
+          <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>
+          Django Templates · FastAPI AI · Celery/Redis · PostgreSQL
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

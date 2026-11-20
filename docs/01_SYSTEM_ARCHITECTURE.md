@@ -2,7 +2,7 @@
 
 ## 1. Tổng Quan Nghiệp Vụ
 
-**InsightHub AI** là nền tảng SaaS quản lý Product Feedback & Product Discovery ứng dụng AI dành cho đội ngũ Product Manager, Customer Support, Developer và Khách hàng.
+**InsightHub AI** là nền tảng SaaS quản lý Product Feedback & Product Discovery thuần Python ứng dụng AI dành cho đội ngũ Product Manager, Customer Support, Developer và Khách hàng.
 
 Hệ thống giải quyết bài toán thực tế:
 - Doanh nghiệp tiếp nhận hàng loạt phản hồi từ nhiều kênh rời rạc (**Website Form**, **Email**, **Live Chat**, **Cộng đồng**).
@@ -17,15 +17,15 @@ InsightHub AI chuẩn hóa toàn bộ luồng từ **Multi-source Ingestion → 
 
 ```mermaid
 flowchart TB
-    subgraph Clients["Client Layer (Browser / Mobile / External Channels)"]
-        WebUI["React + TypeScript + Tailwind SPA<br/>(Dashboard, Inbox, AI Insights, Kanban, Roadmap, Portal)"]
-        ExtSources["External Integrations / Webhooks<br/>(Web Form, Email Sim, Live Chat Sim, Community Sim)"]
+    subgraph Clients["Client Layer (Browser / Mobile)"]
+        Browser["Trình duyệt Web<br/>(Django Templates + Tailwind CSS + Chart.js)"]
     end
 
-    subgraph Backend["Application Layer — Django + DRF (Port 8000)"]
-        Auth["JWT Auth & RBAC Middleware<br/>(Admin, PM, Dev/CS, Customer)"]
-        CoreAPI["REST API Endpoints<br/>(Feedbacks, Insights, Kanban, Roadmap, Notifications, Users)"]
-        Worker["Celery Background Worker<br/>(Async AI Runs, Notifications)"]
+    subgraph WebBackend["Web Application & API — Django (Port 8000)"]
+        WebUI["Django MVT Web Views (apps.web)<br/>(Session Auth, CSRF, 16 Màn hình UI)"]
+        Auth["RBAC Engine & Permissions<br/>(Admin, PM, Dev, CS, Customer + Dynamic Role Matrix)"]
+        CoreAPI["Django REST Framework (/api/...)<br/>(JWT Auth & API Endpoints)"]
+        Worker["Celery Background Worker<br/>(Async AI Pipeline Runs)"]
     end
 
     subgraph AIService["AI Engine — FastAPI (Port 8001)"]
@@ -38,65 +38,70 @@ flowchart TB
     end
 
     subgraph DataLayer["Data & Broker Layer"]
-        PG[("PostgreSQL Database<br/>(16 Tables, Indexes, FK Integrity)")]
-        Redis[("Redis Broker & Cache<br/>(Celery Queue & Task Results)")]
+        PG[("PostgreSQL Database<br/>(13 Tables, Indexes, FK Integrity)")]
+        Redis[("Redis Broker & Result Backend<br/>(Celery Queue & Task Results)")]
     end
 
-    WebUI -->|HTTPS / REST + JWT| CoreAPI
-    ExtSources -->|POST /api/sources/ingest| CoreAPI
+    Browser -->|HTTP/HTTPS + Session Cookie| WebUI
+    Browser -->|REST + JWT nếu tích hợp| CoreAPI
+    WebUI --> Auth
     CoreAPI --> Auth
+    WebUI -->|Django ORM| PG
     CoreAPI -->|Django ORM| PG
+    WebUI -->|Enqueue Job| Redis
     CoreAPI -->|Enqueue Job| Redis
     Redis --> Worker
     Worker -->|HTTP / Internal API| AIService
-    CoreAPI -->|Sync/Fallback HTTP Call| AIService
+    WebUI -->|Sync HTTP Fallback| AIService
+    CoreAPI -->|Sync HTTP Fallback| AIService
     Preproc --> Embed --> Sim --> Cluster --> Summarize --> Scoring
-    Worker -->|Save Clusters, Embeddings, Scores, Notifications| PG
+    Worker -->|Save Clusters, Scores, Task Results| PG
 ```
 
 ---
 
 ## 3. Phân Tách Trách Nhiệm Các Thành Phần
 
-### 3.1 Frontend (`frontend/`)
-- **Framework**: React 18 + TypeScript + Vite.
-- **Styling**: Tailwind CSS theo phong cách Linear / Notion (sidebar cố định, top bar tìm kiếm/thông báo, responsive desktop/tablet/mobile).
-- **Visualization**: Recharts (Area/Line chart theo thời gian, Bar/Pie chart theo nguồn và mức ưu tiên).
-- **State & HTTP**: Axios interceptor tự động gắn Bearer JWT, refresh token khi hết hạn, xử lý loading/empty/error states rõ ràng.
+### 3.1 Web UI (`backend/apps/web/` & `backend/templates/`)
+- **Framework**: Django Templates (Server-side Rendering thuần Python, thay thế cho React/Next.js).
+- **Styling & Visualization**: Tailwind CSS + Lucide Icons + Chart.js (Area/Line chart theo thời gian, Doughnut chart theo nguồn, Bar chart theo trạng thái/tag/mức ưu tiên).
+- **Tương tác nâng cao**: Drag-and-drop Kanban Board, toggle bảng phân quyền chức năng động bằng AJAX + CSRF token, polling trạng thái Celery task (`/insights/ai-task/<task_id>/`).
 
-### 3.2 Backend Core (`backend/`)
-- **Framework**: Django 5 + Django REST Framework + SimpleJWT.
+### 3.2 Backend Core & REST API (`backend/`)
+- **Framework**: Django 6 + Django REST Framework + SimpleJWT + WhiteNoise + Gunicorn.
 - **Nhiệm vụ**:
-  - Quản lý người dùng, phân quyền RBAC ở tầng API (`ADMIN`, `PRODUCT_MANAGER`, `DEVELOPER`, `CUSTOMER_SUPPORT`, `CUSTOMER`).
+  - Quản lý người dùng, phân quyền RBAC động (`Role.permissions` + `apps/accounts/permissions.py` + `apps/web/decorators.py`).
   - Lưu trữ thống nhất tất cả nguồn feedback vào PostgreSQL (`feedbacks` + `feedback_sources`).
-  - Điều phối AI analysis (qua Celery worker khi Redis sẵn sàng, hoặc thực thi đồng bộ an toàn khi không bật worker).
-  - Quản lý Kanban workflow, audit `activity_logs`, `notifications`, và tách dữ liệu **Public Roadmap** vs **Private Roadmap** nghiêm ngặt trên backend.
+  - Điều phối AI analysis (qua Celery worker khi Redis sẵn sàng, hoặc thực thi đồng bộ an toàn khi `CELERY_ENABLED=False`).
+  - Quản lý Kanban workflow 4 cột (`NEW`, `REVIEWING`, `PLANNED`, `DONE`), `notifications`, và tách dữ liệu **Public Roadmap** vs **Private Roadmap** nghiêm ngặt trên backend.
 
 ### 3.3 AI Microservice (`ai_service/`)
 - **Framework**: FastAPI + Pydantic + NumPy + scikit-learn + OpenAI / Anthropic SDK.
 - **Nhiệm vụ**:
   - Tách biệt hoàn toàn tác vụ tính toán vector/clustering/LLM khỏi Django web thread.
   - Có hai chế độ hoạt động minh bạch:
-    1. **LLM + Embedding Cloud Mode** (khi cấu hình `OPENAI_API_KEY` hoặc `ANTHROPIC_API_KEY`): sử dụng `text-embedding-3-small` + GPT/Claude API với prompt ràng buộc chỉ dựa trên bằng chứng feedback.
-    2. **Local ML/NLP Mode** (mặc định khi chưa gắn API key trả phí, hoặc fallback khi key lỗi): sử dụng TF-IDF (word + char_wb n-grams tiếng Việt/Anh) + TruncatedSVD L2-normalized dense embeddings, Cosine Similarity thực sự, DBSCAN clustering thực sự, trích xuất cụm từ khóa & feedback đại diện (centroid), và tính công thức `0.4V + 0.35I + 0.25S` kèm giải thích định lượng.
+    1. **LLM + Embedding Cloud Mode** (khi cấu hình `OPENAI_API_KEY` hoặc `ANTHROPIC_API_KEY`).
+    2. **Local ML/NLP Mode** (mặc định khi chưa gắn API key trả phí, hoặc fallback khi key lỗi): sử dụng TF-IDF (word + concept + char_wb n-grams) + TruncatedSVD L2-normalized dense embeddings, Cosine Similarity, DBSCAN clustering, trích xuất từ khóa và tính công thức `0.4V + 0.35I + 0.25S`.
 
 ### 3.4 Database & Background Jobs
-- **PostgreSQL**: Lưu trữ toàn bộ dữ liệu nghiệp vụ, embeddings, cấu hình nguồn, lịch sử thay đổi và thông báo.
-- **Redis + Celery**: Thực thi pipeline AI bất đồng bộ cho tập dữ liệu lớn và ghi nhận trạng thái job trong bảng `ai_analysis_jobs`.
+- **PostgreSQL**: Lưu trữ toàn bộ 13 bảng dữ liệu nghiệp vụ, cấu hình nguồn, nhóm insight, roadmap và thông báo.
+- **Redis + Celery**: Thực thi pipeline AI bất đồng bộ cho tập dữ liệu lớn khi bật `CELERY_ENABLED=True` kèm endpoint `/api/ai/tasks/<task_id>/` để theo dõi kết quả.
 
 ---
 
-## 4. Ma Trận Phân Quyền RBAC (Backend Enforced)
+## 4. Ma Trận Phân Quyền RBAC Mặc Định (Backend Enforced)
+
+Ngoài ma trận mặc định dưới đây, **Admin** có thể bật/tắt động 8 module chức năng (`dashboard`, `inbox`, `sources`, `insights`, `ai_run`, `kanban`, `roadmap`, `users`) cho từng vai trò ngay trên trang `/users/`.
 
 | Chức năng / Resource | ADMIN | PRODUCT_MANAGER | DEVELOPER / CS | CUSTOMER |
 |---|:---:|:---:|:---:|:---:|
-| Quản lý Users & Roles | Toàn quyền | Chỉ xem danh sách assign | Chỉ xem danh sách cơ bản | Không |
-| Quản lý Products & Sources | Toàn quyền | Xem & chỉnh sửa | Chỉ xem | Chỉ xem Products công khai |
-| Gửi Feedback (Portal / Multi-source) | Có | Có | Có | Có |
-| Xem danh sách Feedback | Tất cả | Tất cả | Được phân công hoặc trong insight được cấp quyền | Chỉ của bản thân |
-| Sửa / Gán / Xóa Feedback | Toàn quyền | Tạo / Sửa / Gán / Merge | Cập nhật trạng thái & comment nội bộ trên item được giao | Sửa nội dung của mình khi trạng thái `NEW` |
-| Chạy AI Pipeline & Quản lý Insight | Toàn quyền | Toàn quyền (Confirm/Reject/Merge/Split/Override Score) | Xem insight liên quan & comment nội bộ | Không |
-| Quản lý Kanban Board | Toàn quyền | Toàn quyền (Drag-drop, Assign, Deadline) | Cập nhật cột trạng thái item được giao & comment | Không |
-| Quản lý Roadmap (Private) | Toàn quyền | Toàn quyền (Tạo từ Insight, Sửa, Tiến độ) | Chỉ xem Private & Public | Không |
+| Quản lý Users & Phân quyền động | Toàn quyền | Xem danh bạ | Xem danh bạ | Không |
+| Quản lý Products & Tags | Toàn quyền | Toàn quyền | Chỉ xem | Chỉ xem Products công khai |
+| Gửi Feedback (Portal / Multi-source) | Có | Có | Có | Có (Portal) |
+| Xem danh sách Feedback | Tất cả | Tất cả | Dev: được phân công; CS: tất cả | Chỉ của bản thân |
+| Sửa / Gán / Xóa Feedback | Toàn quyền | Tạo / Sửa / Gán / Xóa | Cập nhật trạng thái, tag (CS được gán) | Sửa/xóa của mình khi `NEW` |
+| Chạy AI Pipeline & Quản lý Insight | Toàn quyền | Toàn quyền (Confirm/Reject/Merge/Split/Priority) | Xem insight liên quan (nếu có quyền) | Không |
+| Quản lý Kanban Board | Toàn quyền | Toàn quyền (4 cột) | Cập nhật item được phân công | Không |
+| Quản lý Roadmap (Private) | Toàn quyền | Toàn quyền (Tạo/Sửa/Xóa) | Chỉ xem Private & Public | Không |
 | Xem Public Roadmap | Có | Có | Có | Có (ẩn thông tin nội bộ) |
-| Thông báo (Notifications) | Hệ thống | Toàn đội Product | Liên quan đến item được giao | Chỉ liên quan đến feedback của mình |
+| Thông báo (Notifications) | Cá nhân | Toàn đội Product | Cá nhân & item được gán | Chỉ phản hồi của mình / Public Roadmap |

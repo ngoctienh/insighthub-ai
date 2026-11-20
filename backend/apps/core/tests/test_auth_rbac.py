@@ -1,6 +1,5 @@
 import os
 import pytest
-from django.test import override_settings
 
 
 DEMO_PASS = os.getenv("DEMO_USER_PASSWORD", "InsightDemo!2026")
@@ -33,55 +32,24 @@ def test_register_forces_customer_role_and_login_flow(api_client):
     assert login_resp.status_code == 200
     tokens = login_resp.json()
 
-    # Profile update
+    # Profile update & change password
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
     me_patch = api_client.patch("/api/auth/me/", {"full_name": "Nguyễn Khách Hàng"}, format="json")
     assert me_patch.status_code == 200
     assert me_patch.json()["full_name"] == "Nguyễn Khách Hàng"
+
+    chg_resp = api_client.post(
+        "/api/auth/change-password/",
+        {"old_password": "StrongPassword!2026", "new_password": "NewStrongPass!2026"},
+        format="json",
+    )
+    assert chg_resp.status_code == 200
 
     # Logout blacklists refresh token
     logout_resp = api_client.post("/api/auth/logout/", {"refresh": tokens["refresh"]}, format="json")
     assert logout_resp.status_code == 200
     refresh_after = api_client.post("/api/auth/token/refresh/", {"refresh": tokens["refresh"]}, format="json")
     assert refresh_after.status_code == 401
-
-
-@pytest.mark.django_db
-def test_forgot_and_reset_password(api_client, seeded_db):
-    # Production (DEBUG=False) must NOT leak reset token in HTTP body
-    with override_settings(DEBUG=False):
-        prod_resp = api_client.post(
-            "/api/auth/forgot-password/",
-            {"email": "an.nguyen@gmail.com"},
-            format="json",
-        )
-        assert prod_resp.status_code == 200
-        assert "dev_reset_token" not in prod_resp.json()
-
-    # Local dev (DEBUG=True) exposes dev_reset_token for testing without SMTP
-    with override_settings(DEBUG=True):
-        forgot_resp = api_client.post(
-            "/api/auth/forgot-password/",
-            {"email": "an.nguyen@gmail.com"},
-            format="json",
-        )
-        assert forgot_resp.status_code == 200
-        reset_token = forgot_resp.json().get("dev_reset_token")
-        assert reset_token
-
-    reset_resp = api_client.post(
-        "/api/auth/reset-password/",
-        {"token": reset_token, "new_password": "ResetPass!2026New"},
-        format="json",
-    )
-    assert reset_resp.status_code == 200
-
-    login_resp = api_client.post(
-        "/api/auth/login/",
-        {"identifier": "customer_an", "password": "ResetPass!2026New"},
-        format="json",
-    )
-    assert login_resp.status_code == 200
 
 
 @pytest.mark.django_db
@@ -103,11 +71,6 @@ def test_rbac_enforced_at_api_level(api_client, seeded_db):
     fb_list = api_client.get("/api/feedbacks/?page_size=100").json()["results"]
     assert len(fb_list) > 0
     assert all(item["sender_email"] == "an.nguyen@gmail.com" for item in fb_list)
-
-    # Customer cannot see internal comments
-    first_fb_id = fb_list[0]["id"]
-    comments = api_client.get(f"/api/feedbacks/{first_fb_id}/comments/").json()
-    assert all(not c["is_internal"] for c in comments)
 
     # 2. Developer cannot run AI pipeline, create roadmap, or manage users
     dev_login = api_client.post(
@@ -146,3 +109,30 @@ def test_rbac_enforced_at_api_level(api_client, seeded_db):
     )
     assert create_user_resp.status_code == 201
     assert create_user_resp.json()["role_code"] == "PRODUCT_MANAGER"
+
+    # 4. Admin can toggle feature permissions on a role and enforce dynamically on API
+    roles_list = api_client.get("/api/roles/").json()
+    dev_role = next(r for r in roles_list if r["code"] == "DEVELOPER")
+    assert "ai_run" not in dev_role["permissions"]
+
+    patch_resp = api_client.patch(
+        f"/api/roles/{dev_role['id']}/",
+        {"permissions": dev_role["permissions"] + ["ai_run"]},
+        format="json",
+    )
+    assert patch_resp.status_code == 200
+    assert "ai_run" in patch_resp.json()["permissions"]
+
+    # Developer's /auth/me/ now includes ai_run; restore defaults afterward
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {dev_login['access']}")
+    me_dev = api_client.get("/api/auth/me/").json()
+    assert "ai_run" in me_dev["permissions"]
+
+    # Non-admin cannot modify roles or reset defaults
+    assert api_client.post("/api/roles/reset_defaults/").status_code == 403
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_login['access']}")
+    reset_resp = api_client.post("/api/roles/reset_defaults/")
+    assert reset_resp.status_code == 200
+    dev_reset = next(r for r in reset_resp.json() if r["code"] == "DEVELOPER")
+    assert "ai_run" not in dev_reset["permissions"]

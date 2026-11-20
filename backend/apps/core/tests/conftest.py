@@ -65,5 +65,5 @@ def bridge_real_ai_service(monkeypatch):
             return _MockResponse(test_client.post(path, json=json, headers=headers or {}))
 
     monkeypatch.setattr("apps.insights.services.httpx.Client", _InProcessHttpxClient)
-    monkeypatch.setattr("apps.feedbacks.views.httpx.Client", _InProcessHttpxClient)
+    monkeypatch.setattr("apps.feedbacks.services.httpx.Client", _InProcessHttpxClient)
     return test_client

@@ -7,17 +7,8 @@ class Product(models.Model):
     name = models.CharField(max_length=150)
     slug = models.SlugField(max_length=160, unique=True)
     description = models.TextField(blank=True, default="")
-    category = models.CharField(max_length=100, blank=True, default="SaaS / Mobile App")
-    owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="owned_products",
-    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "products"
@@ -42,11 +33,7 @@ class FeedbackSource(models.Model):
 
     code = models.CharField(max_length=32, unique=True, choices=SOURCE_CHOICES)
     name = models.CharField(max_length=100)
-    channel_type = models.CharField(max_length=50, default="WEB")
-    description = models.TextField(blank=True, default="")
-    webhook_token = models.CharField(max_length=128, blank=True, default="", db_index=True)
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "feedback_sources"
@@ -60,8 +47,6 @@ class Tag(models.Model):
     name = models.CharField(max_length=60, unique=True)
     slug = models.SlugField(max_length=70, unique=True)
     color = models.CharField(max_length=20, default="#6366F1")
-    description = models.CharField(max_length=200, blank=True, default="")
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "tags"
@@ -73,22 +58,16 @@ class Tag(models.Model):
 
 class Feedback(models.Model):
     STATUS_NEW = "NEW"
-    STATUS_TRIAGING = "TRIAGING"
-    STATUS_ANALYZING = "ANALYZING"
+    STATUS_REVIEWING = "REVIEWING"
     STATUS_PLANNED = "PLANNED"
-    STATUS_IN_PROGRESS = "IN_PROGRESS"
-    STATUS_COMPLETED = "COMPLETED"
-    STATUS_CLOSED = "CLOSED"
+    STATUS_DONE = "DONE"
     STATUS_DUPLICATE = "DUPLICATE"
 
     STATUS_CHOICES = [
         (STATUS_NEW, "New"),
-        (STATUS_TRIAGING, "Triaging"),
-        (STATUS_ANALYZING, "Analyzing"),
+        (STATUS_REVIEWING, "Reviewing"),
         (STATUS_PLANNED, "Planned"),
-        (STATUS_IN_PROGRESS, "In Progress"),
-        (STATUS_COMPLETED, "Completed"),
-        (STATUS_CLOSED, "Closed"),
+        (STATUS_DONE, "Done"),
         (STATUS_DUPLICATE, "Duplicate"),
     ]
 
@@ -107,9 +86,7 @@ class Feedback(models.Model):
     code = models.CharField(max_length=24, unique=True, blank=True)
     title = models.CharField(max_length=255)
     content = models.TextField()
-    normalized_content = models.TextField(blank=True, default="")
-    embedding = models.JSONField(null=True, blank=True)
-    embedding_model = models.CharField(max_length=100, blank=True, default="")
+    ai_summary = models.TextField(blank=True, default="")
 
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -131,8 +108,6 @@ class Feedback(models.Model):
         on_delete=models.PROTECT,
         related_name="feedbacks",
     )
-    external_reference_id = models.CharField(max_length=150, blank=True, default="")
-    source_metadata = models.JSONField(default=dict, blank=True)
 
     status = models.CharField(
         max_length=24,
@@ -172,18 +147,17 @@ class Feedback(models.Model):
         blank=True,
     )
 
-    submitted_at = models.DateTimeField(default=timezone.now, db_index=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "feedbacks"
-        ordering = ["-submitted_at", "-id"]
+        ordering = ["-created_at", "-id"]
         indexes = [
             models.Index(fields=["product", "status"]),
-            models.Index(fields=["source", "submitted_at"]),
+            models.Index(fields=["source", "created_at"]),
             models.Index(fields=["assigned_to", "status"]),
-            models.Index(fields=["author", "submitted_at"]),
+            models.Index(fields=["author", "created_at"]),
         ]
 
     def save(self, *args, **kwargs):
@@ -207,14 +181,6 @@ class FeedbackTag(models.Model):
         on_delete=models.CASCADE,
         related_name="tag_feedback_links",
     )
-    added_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="added_feedback_tags",
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "feedback_tags"

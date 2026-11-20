@@ -11,4 +11,4 @@ class RoadmapItemAdmin(admin.ModelAdmin):
 
 @admin.register(RoadmapItemInsight)
 class RoadmapItemInsightAdmin(admin.ModelAdmin):
-    list_display = ("roadmap_item", "insight_group", "created_at")
+    list_display = ("roadmap_item", "insight_group")

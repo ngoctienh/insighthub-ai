@@ -21,11 +21,6 @@ backend/media/
 *.sqlite3
 *.log
 
-# Node & Frontend Build
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-
 # IDE & OS
 .vscode/
 .idea/

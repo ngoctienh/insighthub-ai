@@ -1,0 +1,310 @@
+{% extends "layouts/app.html" %}
+{% load web_tags %}
+
+{% block title %}AI Insight Engine — InsightHub AI{% endblock %}
+{% block page_title %}AI Insight Engine{% endblock %}
+{% block page_subtitle %}Embedding Vector · Cosine Similarity · DBSCAN Clustering · Summarization · Priority Scoring (0.4V + 0.35I + 0.25S){% endblock %}
+{% block page_actions %}
+  <a href="{% url 'web-insights' %}?tab={{ active_tab }}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm font-medium hover:bg-slate-50">
+    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+    Làm mới
+  </a>
+{% endblock %}
+
+{% block content %}
+{% if can_run_ai %}
+  <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 mb-6 shadow-md">
+    <form id="ai-run-form" method="post" action="{% url 'web-insights' %}" class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="run_ai" />
+      <input type="hidden" name="use_llm" value="true" />
+      <div>
+        <div class="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-1">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          Điều khiển AI Clustering Pipeline
+        </div>
+        <h2 class="text-lg font-bold">Phân tích &amp; Gom nhóm {{ unassigned|length }} feedback chưa phân loại</h2>
+        <p class="text-xs text-slate-300 mt-0.5">Hỗ trợ tùy chỉnh ngưỡng Cosine Similarity &amp; tham số DBSCAN trước khi sinh Insight.</p>
+        <div id="ai-polling-banner" class="{% if not queued_task_id %}hidden{% endif %} mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-xs text-indigo-100">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+          <span id="ai-polling-text">AI Worker (Celery) đang xử lý tác vụ ngầm...</span>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex flex-col">
+          <span class="text-[10px] text-slate-300 uppercase">Sản phẩm</span>
+          <select name="product_id" class="px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
+            <option value="">Tất cả sản phẩm</option>
+            {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-[10px] text-slate-300 uppercase">Ngưỡng trùng (<span id="sim-lbl">0.72</span>)</span>
+          <input type="range" name="similarity_threshold" min="0.5" max="0.95" step="0.02" value="0.72" oninput="document.getElementById('sim-lbl').textContent=this.value" class="w-28 accent-brand-500" />
+        </div>
+        <div class="flex flex-col">
+          <span class="text-[10px] text-slate-300 uppercase">DBSCAN eps (<span id="eps-lbl">0.48</span>)</span>
+          <input type="range" name="eps" min="0.2" max="0.8" step="0.02" value="0.48" oninput="document.getElementById('eps-lbl').textContent=this.value" class="w-28 accent-brand-500" />
+        </div>
+        <label class="inline-flex items-center gap-1.5 text-xs text-slate-200 cursor-pointer">
+          <input type="checkbox" name="include_clustered" value="true" />
+          Gom lại nhóm chưa xác nhận
+        </label>
+        <button id="run-ai-btn" type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-sm">
+          <i data-lucide="play" class="w-4 h-4"></i>
+          Chạy AI Phân Tích
+        </button>
+      </div>
+    </form>
+  </div>
+{% endif %}
+
+<!-- Tabs -->
+<div class="flex flex-wrap gap-2 mb-6">
+  <a href="?tab=insights" class="px-4 py-2 rounded-xl text-sm font-semibold border transition-colors {% if active_tab == 'insights' %}bg-slate-900 text-white border-slate-900{% else %}bg-white text-slate-700 border-slate-200 hover:bg-slate-50{% endif %}">
+    Nhóm Insight ({{ insights|length }})
+  </a>
+  <a href="?tab=duplicates" class="px-4 py-2 rounded-xl text-sm font-semibold border transition-colors {% if active_tab == 'duplicates' %}bg-slate-900 text-white border-slate-900{% else %}bg-white text-slate-700 border-slate-200 hover:bg-slate-50{% endif %}">
+    Nghi trùng lặp ({{ duplicates|length }})
+  </a>
+  <a href="?tab=unassigned" class="px-4 py-2 rounded-xl text-sm font-semibold border transition-colors {% if active_tab == 'unassigned' %}bg-slate-900 text-white border-slate-900{% else %}bg-white text-slate-700 border-slate-200 hover:bg-slate-50{% endif %}">
+    Chưa phân nhóm ({{ unassigned|length }})
+  </a>
+</div>
+
+{% if active_tab == "insights" %}
+  <div class="grid md:grid-cols-2 gap-5">
+    {% for ins in insights %}
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between hover:border-brand-300 transition-colors">
+        <div>
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono font-bold text-brand-600">{{ ins.code }}</span>
+              {% status_badge ins.verification_status %}
+              {% status_badge ins.status %}
+            </div>
+            {% priority_badge ins.priority_level ins.priority_score %}
+          </div>
+
+          <a href="{% url 'web-insight-detail' ins.id %}" class="text-base font-bold text-slate-900 hover:text-brand-600 line-clamp-2">{{ ins.title }}</a>
+          <p class="text-sm text-slate-600 mt-1.5 line-clamp-3">{{ ins.description }}</p>
+
+          <div class="mt-4 grid grid-cols-3 gap-2 text-center bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+            <div><div class="text-[11px] text-slate-500">Volume (40%)</div><div class="text-sm font-bold text-slate-900">{{ ins.volume_score }}</div></div>
+            <div><div class="text-[11px] text-slate-500">Impact (35%)</div><div class="text-sm font-bold text-slate-900">{{ ins.impact_score }}</div></div>
+            <div><div class="text-[11px] text-slate-500">Severity (25%)</div><div class="text-sm font-bold text-slate-900">{{ ins.severity_score }}</div></div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+          <div class="text-xs text-slate-500">
+            <strong>{{ ins.feedback_count }}</strong> feedback · <strong>{{ ins.affected_customers_count }}</strong> khách hàng
+          </div>
+          <div class="flex items-center gap-1.5">
+            <form method="post" action="{% url 'web-insights' %}" class="inline">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="vote" />
+              <input type="hidden" name="insight_id" value="{{ ins.id }}" />
+              <button type="submit" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-medium {% if ins.user_has_voted %}border-brand-300 bg-brand-50 text-brand-700{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+                <i data-lucide="thumbs-up" class="w-3.5 h-3.5"></i>
+                {{ ins.votes_total }}
+              </button>
+            </form>
+            {% if can_manage and ins.verification_status == "PENDING_REVIEW" %}
+              <form method="post" action="{% url 'web-insights' %}" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="confirm" />
+                <input type="hidden" name="insight_id" value="{{ ins.id }}" />
+                <button type="submit" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700">
+                  <i data-lucide="check" class="w-3.5 h-3.5"></i>Xác nhận
+                </button>
+              </form>
+              <form method="post" action="{% url 'web-insights' %}" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reject" />
+                <input type="hidden" name="insight_id" value="{{ ins.id }}" />
+                <button type="submit" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-50">
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>Từ chối
+                </button>
+              </form>
+            {% endif %}
+            <a href="{% url 'web-insight-detail' ins.id %}" class="px-3 py-1 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50">Chi tiết</a>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-span-2 bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-500">
+        Chưa có nhóm Insight nào. Hãy bấm "Chạy AI Phân Tích" để gom nhóm feedback.
+      </div>
+    {% endfor %}
+  </div>
+{% elif active_tab == "duplicates" %}
+  <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+    <div class="mb-4">
+      <h3 class="font-bold text-slate-900 flex items-center gap-2">
+        <i data-lucide="copy" class="w-4 h-4 text-brand-600"></i>
+        Kiểm duyệt các cặp Feedback có Cosine Similarity cao
+      </h3>
+      <p class="text-xs text-slate-500 mt-1">AI gợi ý ứng viên dựa trên độ tương đồng vector. PM/Admin kiểm tra để xác nhận hoặc bỏ qua.</p>
+    </div>
+    {% if not duplicates %}
+      <p class="text-sm text-slate-500 py-8 text-center">Chưa có cặp nghi trùng lặp nào cần kiểm duyệt.</p>
+    {% else %}
+      <div class="space-y-3">
+        {% for pair in duplicates %}
+          <div class="p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div class="space-y-1 text-sm">
+              <div><a href="{% url 'web-feedback-detail' pair.feedback_a_id %}" class="font-semibold text-brand-600 hover:underline">{{ pair.feedback_a_code }}: {{ pair.feedback_a_title }}</a></div>
+              <div><a href="{% url 'web-feedback-detail' pair.feedback_b_id %}" class="font-semibold text-slate-900 hover:underline">{{ pair.feedback_b_code }}: {{ pair.feedback_b_title }}</a></div>
+              <div class="text-xs text-slate-500">
+                Cosine Similarity: <strong>{{ pair.similarity_score|mul100 }}%</strong>
+                {% if pair.is_exact_normalized_match %} · Trùng văn bản chuẩn hóa{% endif %}
+              </div>
+            </div>
+            {% if can_manage %}
+              <div class="flex items-center gap-2 shrink-0">
+                <form method="post" action="{% url 'web-insights' %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="confirm_duplicate" />
+                  <input type="hidden" name="feedback_a_id" value="{{ pair.feedback_a_id }}" />
+                  <input type="hidden" name="feedback_b_id" value="{{ pair.feedback_b_id }}" />
+                  <input type="hidden" name="similarity_score" value="{{ pair.similarity_score }}" />
+                  <button type="submit" class="px-3.5 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800">
+                    Xác nhận {{ pair.feedback_b_code }} trùng {{ pair.feedback_a_code }}
+                  </button>
+                </form>
+                <form method="post" action="{% url 'web-insights' %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="dismiss_duplicate" />
+                  <input type="hidden" name="feedback_b_id" value="{{ pair.feedback_b_id }}" />
+                  <button type="submit" class="px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50">
+                    Bỏ qua
+                  </button>
+                </form>
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% else %}
+  <form method="post" action="{% url 'web-insights' %}" class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_manual" />
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+      <div>
+        <h3 class="font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="layers" class="w-4 h-4 text-brand-600"></i>
+          Feedback chưa thuộc nhóm Insight nào ({{ unassigned|length }})
+        </h3>
+        <p class="text-xs text-slate-500">Các phản hồi mới hoặc chưa được gom nhóm có thể chạy AI hoặc gom nhóm thủ công.</p>
+      </div>
+      {% if can_manage and unassigned %}
+        <button type="button" onclick="openManualInsightModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand-600 text-white text-xs font-semibold">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          Tạo nhóm thủ công (<span id="selected-fb-count">0</span>)
+        </button>
+      {% endif %}
+    </div>
+
+    {% if not unassigned %}
+      <p class="text-sm text-slate-500 py-8 text-center">Tất cả feedback đã được gom nhóm!</p>
+    {% else %}
+      <div class="space-y-2.5">
+        {% for fb in unassigned %}
+          <label class="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+            {% if can_manage %}
+              <input type="checkbox" name="feedback_ids" value="{{ fb.id }}" onchange="updateManualCount()" class="mt-1 manual-fb-cb" />
+            {% endif %}
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <span class="text-xs font-mono font-bold text-brand-600">{{ fb.code }}</span>
+                {% source_badge fb.source.code %}
+                {% priority_badge fb.impact_level %}
+              </div>
+              <a href="{% url 'web-feedback-detail' fb.id %}" class="font-semibold text-sm text-slate-900 hover:underline">{{ fb.title }}</a>
+              <p class="text-xs text-slate-600 mt-0.5 line-clamp-2">{{ fb.content }}</p>
+            </div>
+          </label>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <!-- Manual Insight Modal -->
+    <div id="manual-insight-modal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <h3 class="text-lg font-bold text-slate-900">Tạo nhóm Insight thủ công</h3>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Sản phẩm</label>
+          <select name="product_id" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+            {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Tên nhóm Insight</label>
+          <input type="text" name="title" id="manual-insight-title" placeholder="Ví dụ: Lỗi xác thực mã OTP chậm" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        </div>
+        <p class="text-xs text-slate-500">Hệ thống sẽ tự tính điểm ưu tiên và tóm tắt cho các feedback đã chọn.</p>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="window.toggleModal('manual-insight-modal', false)" class="px-4 py-2 rounded-lg border border-slate-300 text-sm">Hủy</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold">Tạo Insight</button>
+        </div>
+      </div>
+    </div>
+  </form>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function updateManualCount() {
+    const cnt = document.querySelectorAll(".manual-fb-cb:checked").length;
+    const el = document.getElementById("selected-fb-count");
+    if (el) el.textContent = String(cnt);
+  }
+  function openManualInsightModal() {
+    const cnt = document.querySelectorAll(".manual-fb-cb:checked").length;
+    if (cnt === 0) {
+      window.showToast("Vui lòng chọn ít nhất 1 feedback trước.", "info");
+      return;
+    }
+    const titleInp = document.getElementById("manual-insight-title");
+    if (titleInp) titleInp.required = true;
+    window.toggleModal("manual-insight-modal", true);
+  }
+
+  (function () {
+    const taskId = "{{ queued_task_id|escapejs }}";
+    if (!taskId) return;
+    const banner = document.getElementById("ai-polling-banner");
+    const textEl = document.getElementById("ai-polling-text");
+    if (banner) banner.classList.remove("hidden");
+
+    const poll = setInterval(async function () {
+      try {
+        const res = await fetch("/insights/ai-task/" + encodeURIComponent(taskId) + "/", {
+          headers: { Accept: "application/json" },
+        });
+        const data = await res.json();
+        if (data.state === "SUCCESS") {
+          clearInterval(poll);
+          const m = (data.result && data.result.metrics) || {};
+          window.showToast(
+            "AI hoàn tất: xử lý " + (m.processed_count || 0) + " feedback, tạo " + ((m.created_insight_ids && m.created_insight_ids.length) || 0) + " nhóm insight.",
+            "success"
+          );
+          setTimeout(function () { window.location.href = "/insights/"; }, 900);
+        } else if (data.state === "FAILURE") {
+          clearInterval(poll);
+          if (textEl) textEl.textContent = data.detail || "Tác vụ AI thất bại.";
+          window.showToast(data.detail || "Tác vụ AI thất bại.", "error");
+        }
+      } catch (err) {
+        clearInterval(poll);
+      }
+    }, 2000);
+  })();
+</script>
+{% endblock %}

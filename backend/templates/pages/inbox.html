@@ -1,0 +1,273 @@
+{% extends "layouts/app.html" %}
+{% load web_tags %}
+
+{% block title %}{% if is_internal %}Feedback Inbox{% else %}Phản hồi của tôi{% endif %} — InsightHub AI{% endblock %}
+{% block page_title %}{% if is_internal %}Feedback Inbox{% else %}Phản hồi của tôi{% endif %}{% endblock %}
+{% block page_subtitle %}Tổng cộng {{ total_count }} phản hồi được lưu trong PostgreSQL{% endblock %}
+{% block page_actions %}
+  <button type="button" onclick="window.toggleModal('create-feedback-modal', true)" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
+    <i data-lucide="plus" class="w-4 h-4"></i>
+    Tạo Feedback
+  </button>
+{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<form method="get" action="{% url 'web-inbox' %}" class="bg-white rounded-2xl border border-slate-200 p-4 mb-6 shadow-sm space-y-3">
+  <div class="flex flex-col sm:flex-row gap-2">
+    <div class="relative flex-1">
+      <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+      <input
+        type="text"
+        name="search"
+        value="{{ filters.search }}"
+        placeholder="Tìm theo mã (FB-0001), tiêu đề, nội dung, email..."
+        class="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 text-sm outline-none focus:border-brand-500"
+      />
+    </div>
+    <button type="submit" class="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800">
+      Tìm kiếm
+    </button>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-2 pt-1">
+    <i data-lucide="filter" class="w-4 h-4 text-slate-400 mr-1"></i>
+    <select name="status" onchange="this.form.submit()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
+      <option value="">Tất cả trạng thái</option>
+      <option value="NEW" {% if filters.status == "NEW" %}selected{% endif %}>New</option>
+      <option value="REVIEWING" {% if filters.status == "REVIEWING" %}selected{% endif %}>Reviewing</option>
+      <option value="PLANNED" {% if filters.status == "PLANNED" %}selected{% endif %}>Planned</option>
+      <option value="DONE" {% if filters.status == "DONE" %}selected{% endif %}>Done</option>
+      <option value="DUPLICATE" {% if filters.status == "DUPLICATE" %}selected{% endif %}>Duplicate</option>
+    </select>
+
+    <select name="source" onchange="this.form.submit()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
+      <option value="">Tất cả nguồn</option>
+      <option value="WEB_FORM" {% if filters.source == "WEB_FORM" %}selected{% endif %}>Website Form</option>
+      <option value="EMAIL" {% if filters.source == "EMAIL" %}selected{% endif %}>Email</option>
+      <option value="LIVE_CHAT" {% if filters.source == "LIVE_CHAT" %}selected{% endif %}>Live Chat</option>
+      <option value="COMMUNITY" {% if filters.source == "COMMUNITY" %}selected{% endif %}>Community</option>
+    </select>
+
+    <select name="tag" onchange="this.form.submit()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
+      <option value="">Tất cả Tag</option>
+      {% for t in tags %}
+        <option value="{{ t.id }}" {% if filters.tag == t.id|stringformat:"s" %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="impact_level" onchange="this.form.submit()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
+      <option value="">Mức ảnh hưởng</option>
+      <option value="CRITICAL" {% if filters.impact_level == "CRITICAL" %}selected{% endif %}>Critical</option>
+      <option value="HIGH" {% if filters.impact_level == "HIGH" %}selected{% endif %}>High</option>
+      <option value="MEDIUM" {% if filters.impact_level == "MEDIUM" %}selected{% endif %}>Medium</option>
+      <option value="LOW" {% if filters.impact_level == "LOW" %}selected{% endif %}>Low</option>
+    </select>
+
+    {% if is_internal %}
+      <label class="inline-flex items-center gap-1.5 text-xs text-slate-700 px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+        <input type="checkbox" name="unclustered_only" value="true" {% if filters.unclustered_only %}checked{% endif %} onchange="this.form.submit()" />
+        Chưa gom nhóm
+      </label>
+      <label class="inline-flex items-center gap-1.5 text-xs text-slate-700 px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+        <input type="checkbox" name="duplicate_only" value="true" {% if filters.duplicate_only %}checked{% endif %} onchange="this.form.submit()" />
+        Nghi/Trùng lặp
+      </label>
+    {% endif %}
+
+    {% if filters.search or filters.status or filters.source or filters.tag or filters.impact_level or filters.unclustered_only or filters.duplicate_only %}
+      <a href="{% url 'web-inbox' %}" class="text-xs font-semibold text-brand-600 hover:underline px-2">Xóa lọc</a>
+    {% endif %}
+  </div>
+</form>
+
+<!-- Table -->
+{% if not feedbacks %}
+  <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+    <p class="text-slate-700 font-semibold">Không tìm thấy phản hồi nào phù hợp bộ lọc</p>
+    <p class="text-sm text-slate-500 mt-1">Thử bỏ bộ lọc hoặc tạo một feedback mới.</p>
+  </div>
+{% else %}
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <th class="py-3 px-4">Mã &amp; Tiêu đề</th>
+            <th class="py-3 px-4">Nguồn</th>
+            <th class="py-3 px-4">Trạng thái</th>
+            <th class="py-3 px-4">Ảnh hưởng</th>
+            <th class="py-3 px-4">Insight liên quan</th>
+            <th class="py-3 px-4">Phụ trách</th>
+            <th class="py-3 px-4 text-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-sm">
+          {% for fb in feedbacks %}
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="py-3.5 px-4 max-w-md">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-xs font-mono font-semibold text-brand-600">{{ fb.code }}</span>
+                  <span class="text-xs text-slate-400">{{ fb.created_at|date:"d/m/Y" }}</span>
+                  {% if fb.is_duplicate_confirmed %}
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-700">DUPLICATE</span>
+                  {% endif %}
+                </div>
+                <a href="{% url 'web-feedback-detail' fb.id %}" class="font-semibold text-slate-900 hover:text-brand-600 line-clamp-1">
+                  {{ fb.title }}
+                </a>
+                {% if fb.ai_summary %}
+                  <div class="text-xs text-indigo-700 bg-indigo-50/70 border border-indigo-100 rounded px-2 py-0.5 mt-1 line-clamp-1 flex items-center gap-1">
+                    <i data-lucide="sparkles" class="w-3 h-3 shrink-0"></i>
+                    <span class="truncate">{{ fb.ai_summary }}</span>
+                  </div>
+                {% endif %}
+                <div class="text-xs text-slate-500 mt-0.5 truncate">{{ fb.sender_name }} ({{ fb.sender_email }})</div>
+                {% if fb.tags.all %}
+                  <div class="flex flex-wrap gap-1 mt-1.5">
+                    {% for tag in fb.tags.all %}
+                      <span class="px-2 py-0.5 rounded text-[10px] font-medium border" style="border-color: {{ tag.color }}40; background-color: {{ tag.color }}12; color: {{ tag.color }};">
+                        {{ tag.name }}
+                      </span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </td>
+              <td class="py-3.5 px-4 whitespace-nowrap">{% source_badge fb.source.code %}</td>
+              <td class="py-3.5 px-4 whitespace-nowrap">{% status_badge fb.status %}</td>
+              <td class="py-3.5 px-4 whitespace-nowrap">{% priority_badge fb.impact_level fb.priority_score %}</td>
+              <td class="py-3.5 px-4 max-w-[200px]">
+                {% with ins=fb.insight_groups.first %}
+                  {% if ins %}
+                    {% if is_internal and user|has_perm:"insights" %}
+                      <a href="{% url 'web-insight-detail' ins.id %}" class="text-xs font-medium text-brand-600 hover:underline line-clamp-2">
+                        {{ ins.code }}: {{ ins.title }}
+                      </a>
+                    {% else %}
+                      <span class="text-xs font-medium text-brand-700 line-clamp-2">{{ ins.code }}: {{ ins.title }}</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="text-xs text-slate-400">Chưa gom nhóm</span>
+                  {% endif %}
+                {% endwith %}
+              </td>
+              <td class="py-3.5 px-4 whitespace-nowrap text-xs text-slate-600">
+                {% if fb.assigned_to %}{{ fb.assigned_to.display_name }}{% else %}—{% endif %}
+              </td>
+              <td class="py-3.5 px-4 whitespace-nowrap text-right">
+                <div class="inline-flex items-center gap-1.5">
+                  <form method="post" action="{% url 'web-inbox' %}" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="vote" />
+                    <input type="hidden" name="feedback_id" value="{{ fb.id }}" />
+                    <button type="submit" class="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium {% if fb.user_has_voted %}border-brand-300 bg-brand-50 text-brand-700{% else %}border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}">
+                      <i data-lucide="thumbs-up" class="w-3.5 h-3.5"></i>
+                      {{ fb.annotated_votes_count }}
+                    </button>
+                  </form>
+                  {% if is_pm_or_admin or fb.author_id == user.id and fb.status == "NEW" %}
+                    <form method="post" action="{% url 'web-inbox' %}" onsubmit="return confirm('Xác nhận xóa feedback {{ fb.code }}?');" class="inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete" />
+                      <input type="hidden" name="feedback_id" value="{{ fb.id }}" />
+                      <button type="submit" class="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50" title="Xóa feedback">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                      </button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="px-4 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+        <span>Trang {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} · Tổng {{ total_count }} phản hồi</span>
+        <div class="flex gap-2">
+          {% if page_obj.has_previous %}
+            <a href="?{% if querystring_no_page %}{{ querystring_no_page }}&{% endif %}page={{ page_obj.previous_page_number }}" class="px-3 py-1 rounded border border-slate-300 hover:bg-slate-50">Trước</a>
+          {% endif %}
+          {% if page_obj.has_next %}
+            <a href="?{% if querystring_no_page %}{{ querystring_no_page }}&{% endif %}page={{ page_obj.next_page_number }}" class="px-3 py-1 rounded border border-slate-300 hover:bg-slate-50">Sau</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
+
+<!-- Create Feedback Modal -->
+<div id="create-feedback-modal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-slate-900">Tạo Feedback mới</h3>
+      <button type="button" onclick="window.toggleModal('create-feedback-modal', false)" class="text-slate-400 hover:text-slate-600">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+    <form method="post" action="{% url 'web-inbox' %}" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create_feedback" />
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Sản phẩm</label>
+          <select name="product" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+            {% for p in products %}
+              <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Mức ảnh hưởng</label>
+          <select name="impact_level" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+            <option value="LOW">Low</option>
+            <option value="MEDIUM" selected>Medium</option>
+            <option value="HIGH">High</option>
+            <option value="CRITICAL">Critical</option>
+          </select>
+        </div>
+      </div>
+
+      {% if is_internal %}
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nguồn tiếp nhận</label>
+          <select name="source_code" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+            <option value="WEB_FORM">Website Form</option>
+            <option value="EMAIL">Email</option>
+            <option value="LIVE_CHAT">Live Chat</option>
+            <option value="COMMUNITY">Community Forum</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Tên người gửi</label>
+            <input type="text" name="sender_name" placeholder="{{ user.display_name }}" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Email người gửi</label>
+            <input type="email" name="sender_email" placeholder="{{ user.email }}" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+          </div>
+        </div>
+      {% endif %}
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Tiêu đề</label>
+        <input type="text" name="title" required placeholder="Ví dụ: Không thể thanh toán bằng ví MoMo" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Nội dung chi tiết</label>
+        <textarea name="content" required rows="4" placeholder="Mô tả chi tiết ngữ cảnh gặp lỗi hoặc đề xuất cải tiến..." class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></textarea>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="window.toggleModal('create-feedback-modal', false)" class="px-4 py-2 rounded-lg border border-slate-300 text-sm font-medium">Hủy</button>
+        <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">Lưu Feedback</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

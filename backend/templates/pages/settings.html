@@ -1,0 +1,107 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}Cài đặt — InsightHub AI{% endblock %}
+{% block page_title %}Hồ sơ &amp; Cài đặt hệ thống{% endblock %}
+{% block page_subtitle %}Quản lý thông tin tài khoản, đổi mật khẩu và danh mục sản phẩm/nhãn{% endblock %}
+
+{% block content %}
+<div class="grid lg:grid-cols-2 gap-6">
+  <!-- Profile -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+    <h2 class="font-bold text-slate-900 flex items-center gap-2 mb-4">
+      <i data-lucide="user" class="w-4 h-4 text-brand-600"></i>
+      Hồ sơ cá nhân ({% if user.role %}{{ user.role.name }}{% else %}{{ user.role_code }}{% endif %})
+    </h2>
+    <form method="post" action="{% url 'web-settings' %}" class="space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_profile" />
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Họ và tên</label>
+        <input type="text" name="full_name" value="{{ user.full_name }}" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Chức danh</label>
+        <input type="text" name="job_title" value="{{ user.job_title }}" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+      </div>
+      <div class="pt-2">
+        <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
+          <i data-lucide="save" class="w-4 h-4"></i>
+          Lưu thay đổi
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Change Password -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+    <h2 class="font-bold text-slate-900 flex items-center gap-2 mb-4">
+      <i data-lucide="key-round" class="w-4 h-4 text-amber-600"></i>
+      Đổi mật khẩu
+    </h2>
+    <form method="post" action="{% url 'web-settings' %}" class="space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="change_password" />
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Mật khẩu hiện tại</label>
+        <input type="password" name="old_password" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Mật khẩu mới (tối thiểu 8 ký tự)</label>
+        <input type="password" name="new_password" required minlength="8" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+      </div>
+      <button type="submit" class="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">
+        Cập nhật mật khẩu
+      </button>
+    </form>
+  </div>
+
+  {% if can_manage_catalog %}
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+      <h2 class="font-bold text-slate-900">Quản lý Sản phẩm ({{ products|length }})</h2>
+      <div class="space-y-2">
+        {% for p in products %}
+          <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 flex justify-between items-center text-sm">
+            <div>
+              <div class="font-semibold text-slate-900">{{ p.name }}</div>
+              <div class="text-xs text-slate-500">/{{ p.slug }}</div>
+            </div>
+            <span class="text-xs font-bold text-brand-600">{{ p.feedback_count|default:0 }} fb</span>
+          </div>
+        {% endfor %}
+      </div>
+      <form method="post" action="{% url 'web-settings' %}" class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_product" />
+        <input type="text" name="name" required placeholder="Tên sản phẩm" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs" />
+        <input type="text" name="slug" required placeholder="slug-san-pham" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs" />
+        <button type="submit" class="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i>Thêm
+        </button>
+      </form>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+      <h2 class="font-bold text-slate-900 flex items-center gap-2">
+        <i data-lucide="tag" class="w-4 h-4 text-brand-600"></i>
+        Nhãn phân loại Feedback ({{ tags|length }})
+      </h2>
+      <div class="flex flex-wrap gap-2">
+        {% for t in tags %}
+          <span class="px-3 py-1 rounded-full text-xs font-semibold border" style="border-color: {{ t.color }}50; background-color: {{ t.color }}15; color: {{ t.color }};">
+            {{ t.name }}
+          </span>
+        {% endfor %}
+      </div>
+      <form method="post" action="{% url 'web-settings' %}" class="grid grid-cols-4 gap-2 pt-2 border-t border-slate-100">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_tag" />
+        <input type="text" name="name" required placeholder="Tên nhãn" class="col-span-2 px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs" />
+        <input type="text" name="slug" required placeholder="slug" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs" />
+        <button type="submit" class="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i>Thêm
+        </button>
+      </form>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

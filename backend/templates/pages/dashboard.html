@@ -1,0 +1,262 @@
+{% extends "layouts/app.html" %}
+{% load web_tags %}
+
+{% block title %}Dashboard — InsightHub AI{% endblock %}
+{% block page_title %}Product Discovery Dashboard{% endblock %}
+{% block page_subtitle %}Tổng quan phản hồi đa nguồn, nhóm Insight AI và mức độ ưu tiên từ PostgreSQL{% endblock %}
+{% block page_actions %}
+  <form method="get" class="flex flex-wrap items-center gap-2">
+    <select name="product" onchange="this.form.submit()" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm text-slate-700">
+      <option value="">Tất cả sản phẩm</option>
+      {% for p in products %}
+        <option value="{{ p.id }}" {% if selected_product == p.id|stringformat:"s" %}selected{% endif %}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="days" onchange="this.form.submit()" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm text-slate-700">
+      <option value="14" {% if selected_days == 14 %}selected{% endif %}>14 ngày gần nhất</option>
+      <option value="30" {% if selected_days == 30 %}selected{% endif %}>30 ngày gần nhất</option>
+      <option value="60" {% if selected_days == 60 %}selected{% endif %}>60 ngày gần nhất</option>
+    </select>
+  </form>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- KPI Row -->
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center mb-3 text-brand-600 bg-brand-50"><i data-lucide="inbox" class="w-4 h-4"></i></div>
+      <div class="text-2xl font-bold text-slate-900">{{ data.kpis.total_feedbacks }}</div>
+      <div class="text-xs text-slate-500 mt-0.5 font-medium">Tổng số Feedback</div>
+    </div>
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center mb-3 text-sky-600 bg-sky-50"><i data-lucide="trending-up" class="w-4 h-4"></i></div>
+      <div class="text-2xl font-bold text-slate-900">{{ data.kpis.new_feedbacks }}</div>
+      <div class="text-xs text-slate-500 mt-0.5 font-medium">Feedback Mới</div>
+    </div>
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center mb-3 text-amber-600 bg-amber-50"><i data-lucide="clock" class="w-4 h-4"></i></div>
+      <div class="text-2xl font-bold text-slate-900">{{ data.kpis.in_progress_issues }}</div>
+      <div class="text-xs text-slate-500 mt-0.5 font-medium">Đang Xử Lý</div>
+    </div>
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center mb-3 text-emerald-600 bg-emerald-50"><i data-lucide="check-circle-2" class="w-4 h-4"></i></div>
+      <div class="text-2xl font-bold text-slate-900">{{ data.kpis.completed_issues }}</div>
+      <div class="text-xs text-slate-500 mt-0.5 font-medium">Đã Hoàn Thành</div>
+    </div>
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center mb-3 text-violet-600 bg-violet-50"><i data-lucide="sparkles" class="w-4 h-4"></i></div>
+      <div class="text-2xl font-bold text-slate-900">{{ data.kpis.insights_detected }}</div>
+      <div class="text-xs text-slate-500 mt-0.5 font-medium">Insight AI</div>
+    </div>
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center mb-3 text-slate-600 bg-slate-100"><i data-lucide="copy" class="w-4 h-4"></i></div>
+      <div class="text-2xl font-bold text-slate-900">{{ data.kpis.duplicate_feedbacks }}</div>
+      <div class="text-xs text-slate-500 mt-0.5 font-medium">Trùng Lặp Xác Nhận</div>
+    </div>
+  </div>
+
+  <!-- Charts Row 1 -->
+  <div class="grid lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div class="mb-4">
+        <h2 class="font-bold text-slate-900">Xu hướng Feedback theo thời gian</h2>
+        <p className="text-xs text-slate-500">Số lượng phản hồi tiếp nhận mỗi ngày</p>
+      </div>
+      <div class="h-64"><canvas id="chart-by-date"></canvas></div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <h2 class="font-bold text-slate-900">Phân bổ theo Nguồn tiếp nhận</h2>
+      <p class="text-xs text-slate-500 mb-3">Website Form, Email, Live Chat, Cộng đồng</p>
+      <div class="h-48"><canvas id="chart-by-source"></canvas></div>
+      <div class="grid grid-cols-2 gap-2 mt-3">
+        {% for src in data.feedbacks_by_source %}
+          <div class="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-2.5 py-1.5">
+            <span class="truncate">{{ src.name }}</span>
+            <span class="font-bold text-slate-800">{{ src.count }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row 2 -->
+  <div class="grid lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <h2 class="font-bold text-slate-900">Thống kê Feedback theo Trạng thái</h2>
+      <p class="text-xs text-slate-500 mb-4">New · Reviewing · Planned · Done · Duplicate</p>
+      <div class="h-56"><canvas id="chart-by-status"></canvas></div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <h2 class="font-bold text-slate-900">Thống kê Feedback theo Tag / Danh mục</h2>
+      <p class="text-xs text-slate-500 mb-4">Phân bổ chủ đề phản hồi</p>
+      <div class="h-56"><canvas id="chart-by-tag"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Priority Chart + Top 5 Issues + Urgent Insights -->
+  <div class="grid lg:grid-cols-3 gap-6">
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <h2 class="font-bold text-slate-900">Insight theo Mức độ Ưu tiên</h2>
+      <p class="text-xs text-slate-500 mb-4">Phân loại theo điểm Priority (0–100)</p>
+      <div class="h-60"><canvas id="chart-by-priority"></canvas></div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="font-bold text-slate-900">Top 5 Vấn đề phản ánh nhiều nhất</h2>
+          <p class="text-xs text-slate-500">Xếp hạng theo số lượng feedback</p>
+        </div>
+        {% if user|has_perm:"insights" %}
+          <a href="{% url 'web-insights' %}" class="text-xs font-semibold text-brand-600 hover:underline">Xem tất cả</a>
+        {% endif %}
+      </div>
+      {% if not data.top_5_issues %}
+        <p class="text-sm text-slate-500 py-8 text-center">Chưa có insight nào.</p>
+      {% else %}
+        <div class="space-y-3">
+          {% for issue in data.top_5_issues %}
+            <a href="{% url 'web-insight-detail' issue.id %}" class="block p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-slate-50 transition-colors">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="text-xs font-semibold text-brand-600">#{{ forloop.counter }} · {{ issue.code }}</div>
+                  <div class="text-sm font-semibold text-slate-900 truncate mt-0.5">{{ issue.title }}</div>
+                </div>
+                {% priority_badge issue.priority_level issue.priority_score %}
+              </div>
+              <div class="mt-2 flex items-center gap-3 text-xs text-slate-500">
+                <span>{{ issue.feedback_count }} feedback</span>
+                <span>·</span>
+                <span>{{ issue.affected_customers_count }} khách hàng</span>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600"></i>
+          <h2 class="font-bold text-slate-900">Insight cần xử lý khẩn cấp</h2>
+        </div>
+        {% if user|has_perm:"kanban" %}
+          <a href="{% url 'web-kanban' %}" class="text-xs font-semibold text-brand-600 hover:underline">Kanban</a>
+        {% endif %}
+      </div>
+      {% if not data.urgent_insights %}
+        <p class="text-sm text-slate-500 py-8 text-center">Không có insight khẩn cấp tồn đọng.</p>
+      {% else %}
+        <div class="space-y-3">
+          {% for ins in data.urgent_insights %}
+            <a href="{% url 'web-insight-detail' ins.id %}" class="block p-3 rounded-xl border border-rose-100 bg-rose-50/40 hover:bg-rose-50 transition-colors">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="text-xs font-bold text-slate-600">{{ ins.code }}</span>
+                {% priority_badge ins.priority_level ins.priority_score %}
+              </div>
+              <div class="text-sm font-semibold text-slate-900 line-clamp-2">{{ ins.title }}</div>
+              <div class="mt-2 flex items-center justify-between text-xs">
+                {% status_badge ins.status %}
+                <span class="text-slate-500">{{ ins.feedback_count }} phản hồi</span>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{{ dashboard_json|json_script:"dashboard-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const raw = document.getElementById("dashboard-data");
+    if (!raw || !window.Chart) return;
+    const d = JSON.parse(raw.textContent);
+
+    const sourceColors = { WEB_FORM: "#4f46e5", EMAIL: "#0891b2", LIVE_CHAT: "#10b981", COMMUNITY: "#8b5cf6" };
+    const statusColors = { NEW: "#0ea5e9", REVIEWING: "#8b5cf6", PLANNED: "#f59e0b", DONE: "#10b981", DUPLICATE: "#71717a" };
+    const priorityColors = { CRITICAL: "#e11d48", HIGH: "#f97316", MEDIUM: "#eab308", LOW: "#64748b" };
+
+    new Chart(document.getElementById("chart-by-date"), {
+      type: "line",
+      data: {
+        labels: d.feedbacks_by_date.map((x) => x.date.slice(5)),
+        datasets: [{
+          label: "Feedback",
+          data: d.feedbacks_by_date.map((x) => x.count),
+          borderColor: "#4f46e5",
+          backgroundColor: "rgba(79, 70, 229, 0.14)",
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 2,
+        }],
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+    });
+
+    new Chart(document.getElementById("chart-by-source"), {
+      type: "doughnut",
+      data: {
+        labels: d.feedbacks_by_source.map((x) => x.name),
+        datasets: [{
+          data: d.feedbacks_by_source.map((x) => x.count),
+          backgroundColor: d.feedbacks_by_source.map((x) => sourceColors[x.source_code] || "#6366f1"),
+        }],
+      },
+      options: { responsive: true, maintainAspectRatio: false, cutout: "60%", plugins: { legend: { display: false } } },
+    });
+
+    new Chart(document.getElementById("chart-by-status"), {
+      type: "bar",
+      data: {
+        labels: d.feedbacks_by_status.map((x) => x.status),
+        datasets: [{
+          label: "Số Feedback",
+          data: d.feedbacks_by_status.map((x) => x.count),
+          backgroundColor: d.feedbacks_by_status.map((x) => statusColors[x.status] || "#6366f1"),
+          borderRadius: 6,
+        }],
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+    });
+
+    new Chart(document.getElementById("chart-by-tag"), {
+      type: "bar",
+      data: {
+        labels: d.feedbacks_by_tag.map((x) => x.name),
+        datasets: [{
+          label: "Số Feedback",
+          data: d.feedbacks_by_tag.map((x) => x.count),
+          backgroundColor: d.feedbacks_by_tag.map((x) => x.color || "#6366f1"),
+          borderRadius: 6,
+        }],
+      },
+      options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } },
+    });
+
+    new Chart(document.getElementById("chart-by-priority"), {
+      type: "bar",
+      data: {
+        labels: d.by_priority.map((x) => x.level),
+        datasets: [{
+          label: "Số Insight",
+          data: d.by_priority.map((x) => x.count),
+          backgroundColor: d.by_priority.map((x) => priorityColors[x.level] || "#6366f1"),
+          borderRadius: 6,
+        }],
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% load static %}
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="csrf-token" content="{{ csrf_token }}" />
+    <title>{% block title %}InsightHub AI — Quản lý Feedback Sản phẩm & Product Discovery{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "system-ui", "sans-serif"],
+              mono: ["JetBrains Mono", "monospace"],
+            },
+            colors: {
+              brand: {
+                50: "#eef2ff",
+                100: "#e0e7ff",
+                200: "#c7d2fe",
+                300: "#a5b4fc",
+                400: "#818cf8",
+                500: "#6366f1",
+                600: "#4f46e5",
+                700: "#4338ca",
+                800: "#3730a3",
+                900: "#312e81",
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+    <style>
+      body { font-family: "Inter", system-ui, sans-serif; }
+      .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+      .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    </style>
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body class="bg-slate-50 text-slate-900 antialiased">
+    {% block body %}{% endblock %}
+
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+    <script src="{% static 'js/insighthub.js' %}"></script>
+    {% if messages %}
+      <script>
+        document.addEventListener("DOMContentLoaded", function () {
+          {% for message in messages %}
+            window.showToast("{{ message|escapejs }}", "{% if 'error' in message.tags %}error{% elif 'info' in message.tags or 'warning' in message.tags %}info{% else %}success{% endif %}");
+          {% endfor %}
+        });
+      </script>
+    {% endif %}
+    {% block extra_scripts %}{% endblock %}
+  </body>
+</html>

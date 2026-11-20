@@ -29,4 +29,5 @@ urlpatterns = [
     path("api/", include("apps.insights.urls")),
     path("api/", include("apps.roadmap.urls")),
     path("api/", include("apps.notifications.urls")),
+    path("", include("apps.web.urls")),
 ]

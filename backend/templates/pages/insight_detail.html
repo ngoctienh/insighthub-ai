@@ -1,0 +1,354 @@
+{% extends "layouts/app.html" %}
+{% load web_tags %}
+
+{% block title %}{{ insight.code }} — InsightHub AI{% endblock %}
+{% block page_title %}{{ insight.code }} — {{ insight.title }}{% endblock %}
+{% block page_subtitle %}Sản phẩm: {{ insight.product.name }} · {{ insight.feedback_count }} phản hồi · {{ insight.affected_customers_count }} khách hàng{% endblock %}
+{% block page_actions %}
+  <a href="{% url 'web-insights' %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm font-medium hover:bg-slate-50">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i>Danh sách
+  </a>
+  <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="inline">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="vote" />
+    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-semibold {% if insight.user_has_voted %}bg-brand-50 border-brand-300 text-brand-700{% else %}bg-white border-slate-300 text-slate-700{% endif %}">
+      <i data-lucide="thumbs-up" class="w-4 h-4"></i>
+      Vote ({{ insight.votes_total }})
+    </button>
+  </form>
+  {% if can_manage %}
+    {% if insight.verification_status != "CONFIRMED" %}
+      <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="inline">
+        {% csrf_token %}<input type="hidden" name="action" value="confirm" />
+        <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+          <i data-lucide="check" class="w-4 h-4"></i>Xác nhận nhóm
+        </button>
+      </form>
+    {% endif %}
+    {% if insight.verification_status != "REJECTED" %}
+      <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="inline">
+        {% csrf_token %}<input type="hidden" name="action" value="reject" />
+        <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 bg-white text-sm font-semibold hover:bg-rose-50">
+          <i data-lucide="x" class="w-4 h-4"></i>Từ chối
+        </button>
+      </form>
+    {% endif %}
+    <button type="button" onclick="window.toggleModal('edit-insight-modal', true)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm font-medium hover:bg-slate-50">
+      <i data-lucide="sliders" class="w-4 h-4"></i>Sửa &amp; Ưu tiên
+    </button>
+    <button type="button" onclick="window.toggleModal('merge-modal', true)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm font-medium hover:bg-slate-50">
+      <i data-lucide="git-merge" class="w-4 h-4"></i>Gộp nhóm
+    </button>
+    <button type="button" onclick="window.toggleModal('promote-roadmap-modal', true)" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
+      <i data-lucide="map" class="w-4 h-4"></i>Đưa lên Roadmap
+    </button>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="grid lg:grid-cols-3 gap-6">
+  <!-- Left Main Column -->
+  <div class="lg:col-span-2 space-y-6">
+    <!-- AI Summary Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+      <div class="flex flex-wrap items-center gap-2">
+        {% status_badge insight.verification_status %}
+        {% status_badge insight.status %}
+        {% priority_badge insight.priority_level insight.priority_score %}
+      </div>
+
+      <div>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Tóm tắt vấn đề (AI Summarization)</h3>
+        <p class="text-slate-800 leading-relaxed text-sm">{{ insight.description }}</p>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4 pt-2">
+        <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200">
+          <h4 class="text-xs font-bold uppercase text-amber-900 mb-2">Nguyên nhân có thể xảy ra</h4>
+          <ul class="space-y-1.5 text-xs text-amber-950 list-disc pl-4">
+            {% for c in insight.possible_causes %}<li>{{ c }}</li>{% empty %}<li>Chưa có phân tích nguyên nhân.</li>{% endfor %}
+          </ul>
+        </div>
+        <div class="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200">
+          <h4 class="text-xs font-bold uppercase text-indigo-900 mb-2">Đề xuất hướng cải tiến sản phẩm</h4>
+          <ul class="space-y-1.5 text-xs text-indigo-950 list-disc pl-4">
+            {% for r in insight.ai_recommendations %}<li>{{ r }}</li>{% empty %}<li>Chưa có đề xuất.</li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Draft Customer Reply -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+        <div>
+          <h3 class="font-bold text-slate-900 flex items-center gap-2 text-sm">
+            <i data-lucide="sparkles" class="w-4 h-4 text-brand-600"></i>
+            AI Nháp phản hồi khách hàng
+          </h3>
+          <p class="text-xs text-slate-500">Sinh thư phản hồi chuẩn hóa để đội CSKH/PM xem xét trước khi gửi</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="flex items-center gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="regenerate_reply" />
+            <select name="tone" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
+              <option value="empathetic">Đồng cảm &amp; Tiếp nhận</option>
+              <option value="update">Cập nhật Roadmap</option>
+              <option value="resolved">Đã khắc phục xong</option>
+            </select>
+            <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              Tạo lại
+            </button>
+          </form>
+          <button type="button" onclick="window.copyText(document.getElementById('draft-reply-box').textContent, 'Đã sao chép nháp phản hồi!')" class="p-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50" title="Sao chép">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+      <div id="draft-reply-box" class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 whitespace-pre-line font-normal">{{ insight.draft_customer_reply|default:"Chưa có nháp phản hồi." }}</div>
+    </div>
+
+    <!-- Member Feedbacks -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <form id="split-form" method="post" action="{% url 'web-insight-detail' insight.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="split" />
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-slate-900">Feedback thành viên ({{ members|length }})</h3>
+          {% if can_manage and members %}
+            <button type="button" id="split-open-btn" onclick="openSplitModal()" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold">
+              <i data-lucide="scissors" class="w-3.5 h-3.5"></i>
+              Tách <span id="split-count">0</span> feedback sang nhóm mới
+            </button>
+          {% endif %}
+        </div>
+
+        <div class="space-y-2.5">
+          {% for m in members %}
+            <div class="p-3.5 rounded-xl border border-slate-200 flex items-start justify-between gap-3">
+              <div class="flex items-start gap-2.5 min-w-0">
+                {% if can_manage %}
+                  <input type="checkbox" name="feedback_ids" value="{{ m.feedback_id }}" onchange="updateSplitCount()" class="mt-1 split-fb-cb" />
+                {% endif %}
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2 mb-1">
+                    <span class="text-xs font-mono font-bold text-brand-600">{{ m.feedback.code }}</span>
+                    {% source_badge m.feedback.source.code %}
+                    {% if m.similarity_to_centroid %}
+                      <span class="text-[11px] text-slate-500">Cosine tâm cụm: {{ m.similarity_to_centroid|mul100 }}%</span>
+                    {% endif %}
+                  </div>
+                  <a href="{% url 'web-feedback-detail' m.feedback_id %}" class="font-semibold text-sm text-slate-900 hover:underline">{{ m.feedback.title }}</a>
+                  <p class="text-xs text-slate-600 mt-0.5 line-clamp-2">{{ m.feedback.content }}</p>
+                </div>
+              </div>
+              {% if can_manage %}
+                <button type="button" onclick="removeMemberFeedback({{ m.feedback_id }})" class="p-1.5 text-slate-400 hover:text-rose-600 shrink-0" title="Gỡ khỏi nhóm">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- Split Modal -->
+        <div id="split-modal" class="fixed inset-0 z-50 bg-slate-900/50 hidden items-center justify-center p-4">
+          <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <h3 class="font-bold text-lg text-slate-900">Tách feedback sang nhóm mới</h3>
+            <input type="text" name="new_title" id="split-title-input" placeholder="Tiêu đề nhóm Insight mới" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+            <div class="flex justify-end gap-2">
+              <button type="button" onclick="window.toggleModal('split-modal', false)" class="px-4 py-2 rounded-lg border border-slate-300 text-sm">Hủy</button>
+              <button type="submit" class="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold">Xác nhận tách</button>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <form id="remove-member-form" method="post" action="{% url 'web-insight-detail' insight.id %}" class="hidden">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="remove_feedback" />
+        <input type="hidden" name="feedback_id" id="remove-member-fb-id" value="" />
+      </form>
+    </div>
+  </div>
+
+  <!-- Right Sidebar -->
+  <div class="space-y-6">
+    <!-- Priority Breakdown -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-slate-900 text-sm">Điểm ưu tiên (0.4V + 0.35I + 0.25S)</h3>
+        {% if can_manage %}
+          <button type="button" onclick="window.toggleModal('edit-insight-modal', true)" class="text-xs font-semibold text-brand-600 hover:underline">Chỉnh tay</button>
+        {% endif %}
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1"><span>V — Volume (40%)</span><span>{{ insight.volume_score }}/100</span></div>
+          <div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-indigo-600" style="width: {{ insight.volume_score|clamp100 }}%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1"><span>I — Impact (35%)</span><span>{{ insight.impact_score }}/100</span></div>
+          <div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-amber-500" style="width: {{ insight.impact_score|clamp100 }}%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1"><span>S — Severity (25%)</span><span>{{ insight.severity_score }}/100</span></div>
+          <div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-rose-500" style="width: {{ insight.severity_score|clamp100 }}%"></div></div>
+        </div>
+      </div>
+
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed">
+        {{ insight.priority_reasoning }}
+      </div>
+    </div>
+
+    <!-- Workflow Assignment -->
+    <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="move_kanban" />
+      <h3 class="font-bold text-slate-900 text-sm">Quản lý Kanban &amp; Phụ trách</h3>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Cột Kanban</label>
+        <select name="status" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          <option value="NEW" {% if insight.status == "NEW" %}selected{% endif %}>New</option>
+          <option value="REVIEWING" {% if insight.status == "REVIEWING" %}selected{% endif %}>Reviewing</option>
+          <option value="PLANNED" {% if insight.status == "PLANNED" %}selected{% endif %}>Planned</option>
+          <option value="DONE" {% if insight.status == "DONE" %}selected{% endif %}>Done</option>
+        </select>
+      </div>
+      {% if can_manage %}
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Người phụ trách</label>
+          <select name="assigned_to" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+            <option value="">-- Chưa phân công --</option>
+            {% for u in staff %}
+              <option value="{{ u.id }}" {% if insight.assigned_to_id == u.id %}selected{% endif %}>
+                {{ u.display_name }} ({% if u.role %}{{ u.role.name }}{% else %}{{ u.role_code }}{% endif %})
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+    </form>
+
+    {% if roadmap_items %}
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-2">
+        <h3 class="font-bold text-slate-900 text-sm">Roadmap đã liên kết</h3>
+        {% for rm in roadmap_items %}
+          <a href="{% url 'web-roadmap' %}" class="block p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200 text-xs font-semibold text-emerald-900 hover:bg-emerald-50">
+            {{ rm.code }} · {{ rm.title }} ({{ rm.status }})
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if can_manage %}
+  <!-- Edit Insight & Manual Priority Modal -->
+  <div id="edit-insight-modal" class="fixed inset-0 z-50 bg-slate-900/50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl">
+      <h3 class="font-bold text-lg text-slate-900 mb-3">Chỉnh sửa Insight &amp; Điểm ưu tiên ({{ insight.code }})</h3>
+      <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="space-y-3">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit_insight" />
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Tiêu đề nhóm Insight</label>
+          <input type="text" name="title" required value="{{ insight.title }}" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Tóm tắt mô tả</label>
+          <textarea name="description" rows="3" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">{{ insight.description }}</textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Điểm ưu tiên thủ công (0 – 100)</label>
+          <input type="number" name="priority_score" min="0" max="100" step="0.1" value="{{ insight.priority_score }}" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="window.toggleModal('edit-insight-modal', false)" class="px-4 py-2 rounded-lg border border-slate-300 text-sm">Hủy</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold">Lưu thay đổi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Merge Modal -->
+  <div id="merge-modal" class="fixed inset-0 z-50 bg-slate-900/50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+      <h3 class="font-bold text-lg text-slate-900 mb-3">Gộp nhóm Insight vào {{ insight.code }}</h3>
+      <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="space-y-4">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="merge" />
+        <select name="source_insight_id" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+          <option value="">-- Chọn nhóm nguồn để gộp --</option>
+          {% for x in other_insights %}
+            <option value="{{ x.id }}">{{ x.code }}: {{ x.title }} ({{ x.feedback_count }} feedback)</option>
+          {% endfor %}
+        </select>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="window.toggleModal('merge-modal', false)" class="px-4 py-2 rounded-lg border border-slate-300 text-sm">Hủy</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold">Gộp ngay</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Promote to Roadmap Modal -->
+  <div id="promote-roadmap-modal" class="fixed inset-0 z-50 bg-slate-900/50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl">
+      <h3 class="font-bold text-lg text-slate-900 mb-3">Tạo hạng mục Product Roadmap từ {{ insight.code }}</h3>
+      <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="space-y-3">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="promote_roadmap" />
+        <input type="hidden" name="progress_percent" value="10" />
+        <input type="text" name="title" required value="{{ insight.title }}" placeholder="Tên tính năng / cải tiến" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <textarea name="description" rows="3" required placeholder="Mô tả nội bộ" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">{{ insight.description }}</textarea>
+        <textarea name="public_description" rows="2" placeholder="Mô tả hiển thị trên Public Roadmap (ẩn thông tin nội bộ)" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">{{ insight.description }}</textarea>
+        <div class="grid grid-cols-3 gap-2">
+          <select name="status" class="px-2.5 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+            <option value="PLANNED">Planned</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
+          <select name="visibility" class="px-2.5 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+            <option value="PUBLIC">Public</option>
+            <option value="PRIVATE">Private</option>
+          </select>
+          <input type="text" name="quarter" value="Q1 2027" placeholder="Q1 2027" class="px-2.5 py-2 rounded-lg border border-slate-300 text-sm" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="window.toggleModal('promote-roadmap-modal', false)" class="px-4 py-2 rounded-lg border border-slate-300 text-sm">Hủy</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold">Tạo Roadmap Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function updateSplitCount() {
+    const cnt = document.querySelectorAll(".split-fb-cb:checked").length;
+    const btn = document.getElementById("split-open-btn");
+    const lbl = document.getElementById("split-count");
+    if (lbl) lbl.textContent = String(cnt);
+    if (btn) {
+      if (cnt > 0) btn.classList.remove("hidden");
+      else btn.classList.add("hidden");
+    }
+  }
+  function openSplitModal() {
+    const titleInp = document.getElementById("split-title-input");
+    if (titleInp) titleInp.required = true;
+    window.toggleModal("split-modal", true);
+  }
+  function removeMemberFeedback(fbId) {
+    document.getElementById("remove-member-fb-id").value = String(fbId);
+    document.getElementById("remove-member-form").submit();
+  }
+</script>
+{% endblock %}

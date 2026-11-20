@@ -1,0 +1,243 @@
+{% extends "layouts/app.html" %}
+{% load web_tags %}
+
+{% block title %}Kanban Board — InsightHub AI{% endblock %}
+{% block page_title %}Kanban Board{% endblock %}
+{% block page_subtitle %}Quản lý trạng thái xử lý theo 4 cột: New → Reviewing → Planned → Done{% endblock %}
+{% block page_actions %}
+  <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1">
+    <a href="?mode=insights" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {% if mode == 'insights' %}bg-slate-900 text-white{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+      Nhóm Insight ({{ insights_count }})
+    </a>
+    <a href="?mode=feedbacks" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {% if mode == 'feedbacks' %}bg-slate-900 text-white{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+      Từng Feedback ({{ feedbacks_count }})
+    </a>
+  </div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+  {% for col in columns %}
+    <div
+      data-col-status="{{ col.key }}"
+      ondragover="event.preventDefault()"
+      ondrop="handleKanbanDrop(event, '{{ col.key }}')"
+      class="bg-slate-100/80 rounded-2xl border border-slate-200 p-3 min-h-[460px] flex flex-col gap-3"
+    >
+      <div class="flex items-center justify-between px-1">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full {{ col.dot }}"></span>
+          <span class="font-bold text-sm text-slate-800">{{ col.label }}</span>
+        </div>
+        <span class="px-2 py-0.5 rounded-full bg-white text-xs font-bold text-slate-600 border border-slate-200">
+          {% if mode == "insights" %}{{ col.insights|length }}{% else %}{{ col.feedbacks|length }}{% endif %}
+        </span>
+      </div>
+
+      <div class="space-y-3">
+        {% if mode == "insights" %}
+          {% for card in col.insights %}
+            <div
+              draggable="true"
+              ondragstart="handleKanbanDragStart(event, {{ card.id }})"
+              onclick="openKanbanDrawer('{{ card.id }}')"
+              class="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm hover:border-brand-400 cursor-grab active:cursor-grabbing transition-all"
+            >
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <span class="text-[11px] font-mono font-bold text-brand-600">{{ card.code }}</span>
+                {% priority_badge card.priority_level card.priority_score %}
+              </div>
+              <div class="font-semibold text-sm text-slate-900 line-clamp-2 mb-2">{{ card.title }}</div>
+              <div class="flex items-center justify-between text-[11px] text-slate-500">
+                <span class="inline-flex items-center gap-1">
+                  <i data-lucide="users" class="w-3 h-3"></i>
+                  {{ card.feedback_count }} fb · {{ card.affected_customers_count }} kh
+                </span>
+                <span class="truncate max-w-[110px]">
+                  {% if card.assigned_to %}{{ card.assigned_to.display_name }}{% else %}Chưa gán{% endif %}
+                </span>
+              </div>
+              <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2" onclick="event.stopPropagation()">
+                <form method="post" action="{% url 'web-kanban' %}?mode=insights">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="move_insight" />
+                  <input type="hidden" name="item_id" value="{{ card.id }}" />
+                  <select name="status" onchange="this.form.submit()" class="text-[11px] px-1.5 py-1 rounded border border-slate-200 bg-slate-50">
+                    <option value="NEW" {% if card.status == "NEW" %}selected{% endif %}>New</option>
+                    <option value="REVIEWING" {% if card.status == "REVIEWING" %}selected{% endif %}>Reviewing</option>
+                    <option value="PLANNED" {% if card.status == "PLANNED" %}selected{% endif %}>Planned</option>
+                    <option value="DONE" {% if card.status == "DONE" %}selected{% endif %}>Done</option>
+                  </select>
+                </form>
+                {% if col.next %}
+                  <form method="post" action="{% url 'web-kanban' %}?mode=insights">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="move_insight" />
+                    <input type="hidden" name="item_id" value="{{ card.id }}" />
+                    <input type="hidden" name="status" value="{{ col.next }}" />
+                    <button type="submit" class="inline-flex items-center gap-1 px-2 py-1 rounded bg-brand-50 text-brand-700 hover:bg-brand-100 text-[11px] font-semibold">
+                      {{ col.next }}
+                      <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          {% for fb in col.feedbacks %}
+            <div
+              draggable="true"
+              ondragstart="handleKanbanDragStart(event, {{ fb.id }})"
+              class="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm hover:border-brand-400 cursor-grab active:cursor-grabbing transition-all"
+            >
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <a href="{% url 'web-feedback-detail' fb.id %}" class="text-[11px] font-mono font-bold text-brand-600 hover:underline">{{ fb.code }}</a>
+                {% priority_badge fb.impact_level %}
+              </div>
+              <a href="{% url 'web-feedback-detail' fb.id %}" class="font-semibold text-sm text-slate-900 hover:text-brand-600 line-clamp-2 block mb-2">{{ fb.title }}</a>
+              <div class="mb-2">{% source_badge fb.source.code %}</div>
+              <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                <form method="post" action="{% url 'web-kanban' %}?mode=feedbacks">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="move_feedback" />
+                  <input type="hidden" name="item_id" value="{{ fb.id }}" />
+                  <select name="status" onchange="this.form.submit()" class="text-[11px] px-1.5 py-1 rounded border border-slate-200 bg-slate-50">
+                    <option value="NEW" {% if fb.status == "NEW" %}selected{% endif %}>New</option>
+                    <option value="REVIEWING" {% if fb.status == "REVIEWING" %}selected{% endif %}>Reviewing</option>
+                    <option value="PLANNED" {% if fb.status == "PLANNED" %}selected{% endif %}>Planned</option>
+                    <option value="DONE" {% if fb.status == "DONE" %}selected{% endif %}>Done</option>
+                  </select>
+                </form>
+                {% if col.next %}
+                  <form method="post" action="{% url 'web-kanban' %}?mode=feedbacks">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="move_feedback" />
+                    <input type="hidden" name="item_id" value="{{ fb.id }}" />
+                    <input type="hidden" name="status" value="{{ col.next }}" />
+                    <button type="submit" class="inline-flex items-center gap-1 px-2 py-1 rounded bg-brand-50 text-brand-700 hover:bg-brand-100 text-[11px] font-semibold">
+                      {{ col.next }}
+                      <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Slide-over Insight Detail Drawer -->
+<div id="kanban-drawer" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm hidden justify-end">
+  <div class="bg-white w-full max-w-md h-full overflow-y-auto p-6 shadow-2xl flex flex-col gap-5">
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span id="drawer-code" class="text-xs font-mono font-bold text-brand-600"></span>
+          <span id="drawer-priority" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"></span>
+        </div>
+        <h3 id="drawer-title" class="text-lg font-bold text-slate-900"></h3>
+      </div>
+      <button type="button" onclick="window.toggleModal('kanban-drawer', false)" class="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <p id="drawer-desc" class="text-sm text-slate-600"></p>
+
+    <form method="post" action="{% url 'web-kanban' %}?mode=insights" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="move_insight" />
+      <input type="hidden" name="item_id" id="drawer-item-id" value="" />
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Cột trạng thái</label>
+        <select name="status" id="drawer-status" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-sm bg-white">
+          <option value="NEW">New</option>
+          <option value="REVIEWING">Reviewing</option>
+          <option value="PLANNED">Planned</option>
+          <option value="DONE">Done</option>
+        </select>
+      </div>
+      {% if is_pm_or_admin %}
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Người phụ trách</label>
+          <select name="assigned_to" id="drawer-assignee" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-sm bg-white">
+            <option value="">-- Chưa gán --</option>
+            {% for u in staff %}
+              <option value="{{ u.id }}">{{ u.display_name }} ({% if u.role %}{{ u.role.name }}{% else %}{{ u.role_code }}{% endif %})</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+      <div class="flex justify-between items-center pt-1">
+        <a id="drawer-detail-link" href="#" class="text-xs font-semibold text-brand-600 hover:underline">Mở trang chi tiết Insight →</a>
+        <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold">Lưu cập nhật</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{ insights_payload|json_script:"kanban-insights-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let draggedItemId = null;
+  const kanbanMode = "{{ mode }}";
+  const insightsMap = JSON.parse(document.getElementById("kanban-insights-data").textContent || "{}");
+
+  function handleKanbanDragStart(ev, itemId) {
+    draggedItemId = itemId;
+    ev.dataTransfer.effectAllowed = "move";
+  }
+
+  async function handleKanbanDrop(ev, targetStatus) {
+    ev.preventDefault();
+    if (!draggedItemId) return;
+    const itemId = draggedItemId;
+    draggedItemId = null;
+    try {
+      const res = await fetch("/kanban/?mode=" + kanbanMode, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-CSRFToken": window.getCsrfToken(),
+        },
+        body: JSON.stringify({
+          action: kanbanMode === "insights" ? "move_insight" : "move_feedback",
+          item_id: itemId,
+          status: targetStatus,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        window.showToast(data.detail || "Không thể di chuyển thẻ này.", "error");
+        return;
+      }
+      window.showToast("Đã chuyển " + data.code + " sang " + data.status, "success");
+      setTimeout(function () { window.location.reload(); }, 450);
+    } catch (err) {
+      window.showToast("Lỗi kết nối khi cập nhật Kanban.", "error");
+    }
+  }
+
+  function openKanbanDrawer(cardId) {
+    const card = insightsMap[String(cardId)];
+    if (!card) return;
+    document.getElementById("drawer-item-id").value = card.id;
+    document.getElementById("drawer-code").textContent = card.code;
+    document.getElementById("drawer-priority").textContent = card.priority_level + " · " + card.priority_score;
+    document.getElementById("drawer-title").textContent = card.title;
+    document.getElementById("drawer-desc").textContent = card.description;
+    document.getElementById("drawer-status").value = card.status;
+    const assigneeEl = document.getElementById("drawer-assignee");
+    if (assigneeEl) assigneeEl.value = card.assigned_to || "";
+    document.getElementById("drawer-detail-link").href = "/insights/" + card.id + "/";
+    window.toggleModal("kanban-drawer", true);
+  }
+</script>
+{% endblock %}

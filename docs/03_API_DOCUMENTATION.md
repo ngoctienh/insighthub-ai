@@ -1,36 +1,55 @@
-# TÀI LIỆU API — INSIGHTHUB AI
+# TÀI LIỆU ROUTES & REST API — INSIGHTHUB AI
 
-Tài liệu đặc tả REST API cho **Django REST Backend** (`/api/...`) và **FastAPI AI Microservice**.
+Tài liệu đặc tả **Web Routes (Django Templates)**, **REST API (Django + DRF)** và **FastAPI AI Microservice**.
 
 ---
 
-## 1. Quy ước chung & Xác thực
+## 1. Web Application Routes (`apps.web` — Django Templates + Session Auth)
 
-### 1.1. Base URL
-| Service | Local Development | Docker Compose (qua Nginx) | Cloud Production (ví dụ) |
+| Route | View | Quyền truy cập | Mô tả |
 |---|---|---|---|
-| **Backend API** | `http://localhost:8000/api` | `/api` (proxy sang `backend:8000`) | `https://<backend-domain>/api` |
+| `/` | `landing_view` | Public | Trang giới thiệu tổng quan quy trình Product Discovery. |
+| `/login/` | `login_view` | Public | Đăng nhập bằng username hoặc email (hỗ trợ chọn nhanh tài khoản demo). |
+| `/register/` | `register_view` | Public | Đăng ký tài khoản mới (tự động gán vai trò `CUSTOMER`). |
+| `/logout/` | `logout_view` | `POST` | Đăng xuất session hiện tại. |
+| `/public-roadmap/` | `public_roadmap_view` | Public | Lộ trình sản phẩm công khai (chỉ `visibility=PUBLIC`, ẩn thông tin nội bộ). |
+| `/portal/` | `portal_view` | `login_required` | Cổng khách hàng: gửi feedback, xem tiến trình 4 bước và thông báo. |
+| `/dashboard/` | `dashboard_view` | `dashboard` | KPIs, 5 biểu đồ Chart.js, Top 5 vấn đề & Insight khẩn cấp. |
+| `/inbox/` | `inbox_view` | `inbox` | Danh sách feedback, lọc đa chiều, tìm kiếm, phân trang, tạo mới, vote, xóa. |
+| `/inbox/<id>/` | `feedback_detail_view` | `inbox` / `kanban` | Chi tiết feedback, tóm tắt AI, quét tương đồng Cosine, đánh dấu trùng, gán người xử lý, tag. |
+| `/sources/` | `sources_hub_view` | `sources` | Giả lập tiếp nhận đa nguồn (Website Form, Email, Live Chat, Community). |
+| `/insights/` | `insights_view` | `insights` | Chạy AI Clustering (Sync/Celery polling), duyệt Insight, kiểm duyệt trùng lặp (Xác nhận/Bỏ qua), gom nhóm thủ công. |
+| `/insights/ai-task/<task_id>/` | `ai_task_status_view` | `ai_run` / `insights` | JSON polling trạng thái Celery task. |
+| `/insights/<id>/` | `insight_detail_view` | `insights` | Chi tiết Insight, nguyên nhân, đề xuất, nháp phản hồi (3 tone), chỉnh sửa & ưu tiên tay, gộp/tách nhóm, đưa lên Roadmap. |
+| `/kanban/` | `kanban_view` | `kanban` | Bảng Kanban 4 cột (`NEW`, `REVIEWING`, `PLANNED`, `DONE`) cho Insight & Feedback (hỗ trợ Drag & Drop). |
+| `/roadmap/` | `roadmap_view` | `roadmap` | Quản trị Product Roadmap (Public & Private) và liên kết Insight. |
+| `/notifications/` | `notifications_view` | `login_required` | Trung tâm thông báo, lọc chưa đọc, đánh dấu đã đọc & điều hướng. |
+| `/users/` | `users_view` | `users` (Admin ghi) | Quản lý user & bảng ma trận phân quyền chức năng động cho từng Role. |
+| `/settings/` | `settings_view` | `login_required` | Hồ sơ cá nhân, đổi mật khẩu, quản lý Sản phẩm & Tag (Admin/PM). |
+
+---
+
+## 2. Quy ước REST API & Xác thực (`/api/...`)
+
+### 2.1. Base URL
+| Service | Local Development | Docker Compose | Cloud Production (Render/Railway) |
+|---|---|---|---|
+| **Web & Backend API** | `http://localhost:8000/api` | `http://localhost:8000/api` | `https://<web-domain>/api` |
 | **AI Service** | `http://localhost:8001` | `http://ai_service:8001` | `https://<ai-service-domain>` |
 
-### 1.2. Cơ chế xác thực (Headers)
-1. **JWT Bearer Authentication** (Backend `/api/...`):
+### 2.2. Headers xác thực
+1. **JWT Bearer Authentication** (cho REST API `/api/...`):
    ```http
    Authorization: Bearer <access_token>
    ```
-   - `ACCESS_TOKEN_LIFETIME`: `60` phút; `REFRESH_TOKEN_LIFETIME`: `7` ngày (hỗ trợ xoay vòng + blacklist khi logout).
-2. **Webhook Source Token** (cho kênh tiếp nhận ngoài trên `POST /api/sources/ingest/`):
-   ```http
-   X-Source-Token: <webhook_token>
-   ```
-   - Dùng khi hệ thống bên ngoài đẩy dữ liệu vào mà không cần đăng nhập JWT. Token demo trong seed data: `wh_web_bepviet_2026`, `wh_email_bepviet_2026`, `wh_chat_bepviet_2026`, `wh_comm_bepviet_2026`.
-3. **Internal Service Key** (Django gọi FastAPI AI Service):
+   - `ACCESS_TOKEN_LIFETIME`: `60` phút; `REFRESH_TOKEN_LIFETIME`: `7` ngày (xoay vòng + blacklist khi logout).
+2. **Internal Service Key** (Django gọi FastAPI AI Service):
    ```http
    X-API-Key: <AI_SERVICE_API_KEY>
    ```
-   - AI Service kiểm tra header này khi biến môi trường `AI_SERVICE_API_KEY` được cấu hình khác giá trị placeholder mặc định `change-this-internal-service-secret`.
 
-### 1.3. Phân trang & Định dạng lỗi chuẩn
-- **Pagination mặc định**: `PAGE_SIZE = 20` (`page`, `page_size`). Response có cấu trúc `{ "count", "next", "previous", "results" }`. Một số danh mục nhẹ (`roles`, `sources`, `tags`, `roadmap`, `roadmap/public`) tắt phân trang (`pagination_class = None`).
+### 2.3. Phân trang & Định dạng lỗi chuẩn
+- **Pagination mặc định**: `PAGE_SIZE = 20` (`page`, `page_size`). Response: `{ "count", "next", "previous", "results" }`.
 - **Định dạng lỗi (`custom_exception_handler`)**:
   ```json
   {
@@ -43,171 +62,87 @@ Tài liệu đặc tả REST API cho **Django REST Backend** (`/api/...`) và **
 
 ---
 
-## 2. Backend REST API (Django + DRF)
+## 3. Chi tiết REST API Endpoints (`backend/`)
 
-### 2.1. Health Check
+### 3.1. Health Check
 | Method | Endpoint | Quyền | Mô tả |
 |---|---|---|---|
-| `GET` | `/api/health/` | Public (`AllowAny`) | Kiểm tra trạng thái backend & kết nối DB (`SELECT 1`). Trả `200 ok` hoặc `503 degraded`. |
+| `GET` | `/api/health/` | `AllowAny` | Kiểm tra backend & kết nối PostgreSQL (`SELECT 1`). |
 
----
-
-### 2.2. Authentication, Profile & User Management (`apps.accounts`)
-
-| Method | Endpoint | Quyền | Request Body / Params | Response chính |
-|---|---|---|---|---|
-| `POST` | `/api/auth/register/` | `AllowAny` | `{ "username", "email", "full_name", "password" }` (mật khẩu >= 8 ký tự) | `201` `{ "access", "refresh", "user" }` (mặc định vai trò `CUSTOMER`) |
-| `POST` | `/api/auth/login/` | `AllowAny` | `{ "identifier", "password" }` (`identifier` là email hoặc username) | `200` `{ "access", "refresh", "user" }` |
-| `POST` | `/api/auth/logout/` | `IsAuthenticated` | `{ "refresh" }` | `200` `{ "detail": "Đăng xuất thành công." }` (blacklist refresh token) |
-| `POST` | `/api/auth/token/refresh/` | `AllowAny` | `{ "refresh" }` | `200` `{ "access", "refresh" }` |
-| `GET` | `/api/auth/me/` | `IsAuthenticated` | — | `200` Thông tin user kèm `permissions` |
-| `PATCH` | `/api/auth/me/` | `IsAuthenticated` | `{ "full_name", "job_title", "department", "avatar_url", "email_notifications_enabled" }` | `200` Profile đã cập nhật |
-| `POST` | `/api/auth/change-password/` | `IsAuthenticated` | `{ "old_password", "new_password" }` | `200` `{ "detail": "Đổi mật khẩu thành công." }` |
-| `POST` | `/api/auth/forgot-password/` | `AllowAny` | `{ "email" }` | `200` Tạo `PasswordResetToken` hết hạn sau 30 phút (trả thêm `dev_reset_token` khi `DJANGO_DEBUG=True`) |
-| `POST` | `/api/auth/reset-password/` | `AllowAny` | `{ "token", "new_password" }` | `200` Đặt lại mật khẩu thành công |
-| `GET` | `/api/roles/` | `IsAuthenticated` | — | Danh sách 5 role hệ thống |
-| `GET/POST` | `/api/users/` | Đọc: `IsInternalTeam`; Ghi: `IsAdmin` | Filter `role`, `is_active`, `search` | Danh sách / tạo user (`role_code`, `password`, ...) |
-| `GET/PATCH/DELETE` | `/api/users/{id}/` | `UserManagementPermission` | `{ "role_code", "full_name", "is_active", ... }` | Cập nhật thông tin / phân quyền |
-| `POST` | `/api/users/{id}/toggle_active/` | `IsAdmin` | — | Đảo trạng thái `is_active` |
-
-#### Ví dụ `POST /api/auth/login/`
-```json
-// Request
-{
-  "identifier": "pm@insighthub.vn",
-  "password": "InsightDemo!2026"
-}
-
-// Response 200 OK
-{
-  "access": "eyJhbGciOiJIUzI1NiIs...",
-  "refresh": "eyJhbGciOiJIUzI1NiIs...",
-  "user": {
-    "id": 2,
-    "username": "pm_minh",
-    "email": "pm@insighthub.vn",
-    "full_name": "Trần Quang Minh",
-    "display_name": "Trần Quang Minh",
-    "role_code": "PRODUCT_MANAGER",
-    "role_name": "Product Manager",
-    "permissions": ["feedback:*", "insight:*", "kanban:*", "roadmap:*", "ai:run"]
-  }
-}
-```
-
----
-
-### 2.3. Dashboard, Products, Sources & Tags (`apps.feedbacks`)
-
-| Method | Endpoint | Quyền | Mô tả / Query Params |
+### 3.2. Auth, Roles & User Management (`apps.accounts`)
+| Method | Endpoint | Quyền | Mô tả |
 |---|---|---|---|
-| `GET` | `/api/dashboard/` | `IsAuthenticated` (lọc theo RBAC: Customer chỉ thấy số liệu phản hồi của mình; Developer chỉ thấy mục được gán) | Query: `product`, `days` (7..90, mặc định `30`). Trả `kpis`, `feedbacks_by_date`, `feedbacks_by_source`, `by_priority`, `top_5_issues`, `urgent_insights`. |
-| `GET` | `/api/products/` | `AllowAny` (xem danh sách) | Danh sách sản phẩm kèm `feedback_count`. |
-| `POST/PATCH/DELETE` | `/api/products/` | `IsPMOrAdmin` | Quản lý sản phẩm (`name`, `slug`, `description`, `category`, `owner`, `is_active`). |
-| `GET` | `/api/sources/` | `IsAuthenticated` | Danh sách kênh tiếp nhận (`WEB_FORM`, `EMAIL`, `LIVE_CHAT`, `COMMUNITY`). Trường `webhook_token` bị ẩn với vai trò ngoài `ADMIN`/`PRODUCT_MANAGER`. |
-| `GET` | `/api/tags/` | `IsAuthenticated` | Danh sách nhãn (`bug`, `payment`, `delivery`, ...). |
-| `POST/PATCH/DELETE` | `/api/tags/` | `IsPMOrAdmin` | Quản lý nhãn (`name`, `slug`, `color`, `description`). |
+| `POST` | `/api/auth/register/` | `AllowAny` | Đăng ký tài khoản mới (ép role `CUSTOMER`), trả về `access`, `refresh`, `user`. |
+| `POST` | `/api/auth/login/` | `AllowAny` | Đăng nhập bằng `identifier` (email hoặc username) + `password`. |
+| `POST` | `/api/auth/logout/` | `IsAuthenticated` | Blacklist `refresh` token. |
+| `POST` | `/api/auth/token/refresh/` | `AllowAny` | Làm mới JWT token. |
+| `GET/PATCH` | `/api/auth/me/` | `IsAuthenticated` | Xem / cập nhật `full_name`, `job_title`, danh sách `permissions`. |
+| `POST` | `/api/auth/change-password/` | `IsAuthenticated` | Đổi mật khẩu (`old_password`, `new_password`). |
+| `GET` | `/api/roles/` | `IsAuthenticated` | Danh sách 5 role kèm `permissions` và `user_count`. |
+| `PATCH/PUT` | `/api/roles/{id}/` | `IsAdmin` | Cập nhật danh sách `permissions` cho vai trò. |
+| `GET` | `/api/roles/features/` | `IsAuthenticated` | Danh sách 8 feature modules có thể phân quyền. |
+| `POST` | `/api/roles/reset_defaults/` | `IsAdmin` | Khôi phục quyền mặc định cho cả 5 role. |
+| `GET/POST/PATCH/DELETE` | `/api/users/` | `UserManagementPermission` | Đọc: có quyền `users` (hoặc `?internal_only=true` cho team nội bộ); Ghi: `IsAdmin`. |
+| `POST` | `/api/users/{id}/toggle_active/` | `IsAdmin` | Bật/tắt trạng thái `is_active`. |
 
----
-
-### 2.4. Feedback Inbox & Multi-source Hub (`apps.feedbacks`)
-
-#### Kiểm soát truy cập theo dòng (Row-level RBAC) trên `/api/feedbacks/`:
-- `ADMIN`, `PRODUCT_MANAGER`, `CUSTOMER_SUPPORT`: Xem toàn bộ feedback.
-- `DEVELOPER`: Chỉ xem feedback được gán trực tiếp (`assigned_to`) hoặc thuộc Insight được gán cho mình.
-- `CUSTOMER`: Chỉ xem feedback của chính mình (`author=user` hoặc `sender_email=user.email`); chỉ được sửa/xóa feedback của mình khi `status == "NEW"`; không xem được `comment` có `is_internal=true`.
-
-| Method | Endpoint | Quyền | Mô tả & Payload |
+### 3.3. Dashboard, Products, Sources & Tags (`apps.feedbacks`)
+| Method | Endpoint | Quyền | Mô tả |
 |---|---|---|---|
-| `POST` | `/api/sources/ingest/` | JWT **hoặc** `X-Source-Token` | Tiếp nhận phản hồi đa nguồn. Body: `{ "source_code": "EMAIL" \| "LIVE_CHAT" \| "COMMUNITY" \| "WEB_FORM", "product_id"?, "title", "content", "sender_name"?, "sender_email"?, "impact_level"?, "external_reference_id"?, "source_metadata"?, "tag_ids"? }` |
-| `GET` | `/api/feedbacks/` | `IsAuthenticated` (theo RBAC) | Query filters: `search`, `status`, `source` (`source__code`), `impact_level`, `priority_level`, `product`, `assigned_to` (`unassigned` hoặc user ID), `tag` (ID hoặc slug), `date_from`, `date_to` (`YYYY-MM-DD`), `unclustered_only=true`, `duplicate_only=true`. |
-| `POST` | `/api/feedbacks/` | `IsAuthenticated` | Tạo feedback mới (`title`, `content`, `product`, `source` hoặc `source_code`, `impact_level`, `tag_ids`). |
-| `GET/PATCH/DELETE` | `/api/feedbacks/{id}/` | `IsAuthenticated` (kiểm tra quyền theo role trên view) | Xem chi tiết, cập nhật trạng thái/nội dung hoặc xóa theo quyền. |
-| `POST` | `/api/feedbacks/{id}/assign/` | `ADMIN`, `PRODUCT_MANAGER`, `CUSTOMER_SUPPORT` | `{ "assigned_to": <user_id | null> }` (tạo thông báo cho người được phân công). |
-| `POST` | `/api/feedbacks/{id}/tags/` | `IsInternalTeam` | `{ "tag_ids": [1, 2] }` |
-| `POST` | `/api/feedbacks/{id}/mark_duplicate/` | `ADMIN`, `PRODUCT_MANAGER`, `CUSTOMER_SUPPORT` | `{ "duplicate_of_id": <target_id>, "similarity_score"?: 0.89, "confirm"?: true }` |
-| `POST` | `/api/feedbacks/{id}/unmark_duplicate/` | `ADMIN`, `PRODUCT_MANAGER`, `CUSTOMER_SUPPORT` | Gỡ đánh dấu trùng lặp. |
-| `POST` | `/api/feedbacks/{id}/vote/` | `IsAuthenticated` | Bật/tắt bình chọn (`{"voted": bool, "votes_count": int}`). |
-| `GET/POST` | `/api/feedbacks/{id}/comments/` | `IsAuthenticated` | Customer chỉ thấy và chỉ tạo được comment `is_internal=false`. Team nội bộ gửi được `is_internal=true/false`. |
-| `GET` | `/api/feedbacks/{id}/activity/` | `IsInternalTeam` | Lịch sử audit trên feedback. |
-| `GET` | `/api/feedbacks/{id}/similar/` | `IsInternalTeam` | Query `top_k` (mặc định 6), `min_similarity` (mặc định 0.35). Gọi AI Service `/similarity/search` tìm feedback tương đồng gần nhất. |
+| `GET` | `/api/dashboard/` | `require_feature("dashboard")` | Query `product`, `days` (7..90). Trả `kpis`, `feedbacks_by_date`, `feedbacks_by_source`, `feedbacks_by_status`, `feedbacks_by_tag`, `by_priority`, `top_5_issues`, `urgent_insights`. |
+| `GET/POST/PATCH/DELETE` | `/api/products/` | Đọc: `AllowAny`; Ghi: `IsPMOrAdmin` | Quản lý sản phẩm (`name`, `slug`, `description`, `is_active`). |
+| `GET/POST/PATCH/DELETE` | `/api/sources/` | Đọc: `IsAuthenticated`; Ghi: `IsPMOrAdmin` | Quản lý kênh tiếp nhận (`WEB_FORM`, `EMAIL`, `LIVE_CHAT`, `COMMUNITY`). |
+| `GET/POST/PATCH/DELETE` | `/api/tags/` | Đọc: `IsAuthenticated`; Ghi: `IsPMOrAdmin` | Quản lý nhãn (`name`, `slug`, `color`). |
 
----
-
-### 2.5. AI Insight Engine & Kanban Board (`apps.insights`)
-
-> Toàn bộ endpoints dưới đây yêu cầu `IsInternalTeam` (`ADMIN`, `PRODUCT_MANAGER`, `DEVELOPER`, `CUSTOMER_SUPPORT`). Vai trò `CUSTOMER` bị chặn `403 Forbidden`.
-> Developer & Customer Support chỉ xem được insight được gán cho mình hoặc đã xác nhận (`VERIFY_CONFIRMED`).
-
-| Method | Endpoint | Quyền | Mô tả & Payload |
-|---|---|---|---|
-| `POST` | `/api/ai/analyze/` | `IsPMOrAdmin` | Chạy AI Pipeline gom nhóm feedback. Body: `{ "product_id"?, "similarity_threshold": 0.72, "eps": 0.48, "min_samples": 2, "use_llm": true, "include_clustered": false }`. Trả `200 OK` khi `CELERY_ENABLED=False` hoặc `202 Accepted` khi đẩy vào Celery queue. |
-| `GET` | `/api/ai/jobs/` | `IsInternalTeam` | Lịch sử các lần chạy `AIAnalysisJob` kèm `metrics`, `duplicate_candidates`, `unassigned_feedback_ids`. |
-| `GET` | `/api/ai/unassigned/` | `IsInternalTeam` | Danh sách tối đa 100 feedback chưa thuộc nhóm insight nào (trừ nhóm bị reject và feedback đã xác nhận trùng). |
-| `GET` | `/api/insights/` | `IsInternalTeam` | Filters: `status`, `verification_status`, `priority_level`, `product`, `assigned_to`, `search`, `exclude_rejected=true`. |
-| `POST` | `/api/insights/` | `IsPMOrAdmin` | Tạo nhóm insight thủ công (`product`, `title`, `description`, `feedback_ids`, ...). |
-| `GET/PATCH/DELETE` | `/api/insights/{id}/` | `IsInternalTeam` / `IsPMOrAdmin` | Chi tiết nhóm insight (gồm `members`, `possible_causes`, `ai_recommendations`, `draft_customer_reply`, `priority_reasoning`, `roadmap_items`). |
-| `POST` | `/api/insights/{id}/confirm/` | `IsPMOrAdmin` | Xác nhận nhóm insight đề xuất (`VERIFY_CONFIRMED`) và thông báo cho team. |
-| `POST` | `/api/insights/{id}/reject/` | `IsPMOrAdmin` | Từ chối nhóm insight đề xuất (`VERIFY_REJECTED`). |
-| `POST` | `/api/insights/{id}/override_priority/` | `IsPMOrAdmin` | PM chỉnh tay điểm ưu tiên: `{ "priority_score": 0..100, "priority_level"?, "pm_priority_notes"? }`. |
-| `POST` | `/api/insights/{id}/add_feedbacks/` | `IsPMOrAdmin` | `{ "feedback_ids": [12, 15] }` — thêm feedback vào nhóm & tính lại điểm. |
-| `POST` | `/api/insights/{id}/remove_feedback/` | `IsPMOrAdmin` | `{ "feedback_id": 12 }` — gỡ feedback khỏi nhóm. |
-| `POST` | `/api/insights/{id}/merge/` | `IsPMOrAdmin` | `{ "source_insight_id": 4 }` — gộp nhóm nguồn vào nhóm hiện tại. |
-| `POST` | `/api/insights/{id}/split/` | `IsPMOrAdmin` | `{ "feedback_ids": [21, 22], "new_title": "..." }` — tách thành nhóm insight mới (`201 Created`). |
-| `POST` | `/api/insights/{id}/move_kanban/` | `ADMIN`, `PM`, hoặc người được phân công | `{ "status"?: "NEW"\|"ANALYZING"\|"PLANNED"\|"IN_PROGRESS"\|"COMPLETED", "assigned_to"?, "due_date"? }`. Đồng bộ trạng thái feedback thành viên khi chuyển sang `PLANNED`/`IN_PROGRESS`/`COMPLETED` và gửi thông báo. |
-| `POST` | `/api/insights/{id}/regenerate_reply/` | `IsInternalTeam` | `{ "tone": "empathetic" \| "update" \| "resolved", "use_llm": true }` — tạo lại nháp phản hồi khách hàng qua AI Service. |
-| `POST` | `/api/insights/{id}/vote/` | `IsInternalTeam` | Bình chọn nội bộ cho insight. |
-| `GET/POST` | `/api/insights/{id}/comments/` | `IsInternalTeam` | Bình luận nội bộ (`is_internal=true`) trên card Kanban / Insight. |
-| `GET` | `/api/insights/{id}/activity/` | `IsInternalTeam` | Nhật ký thay đổi trên Insight. |
-
----
-
-### 2.6. Product Roadmap (`apps.roadmap`)
-
-| Method | Endpoint | Quyền | Mô tả & Payload |
-|---|---|---|---|
-| `GET` | `/api/roadmap/public/` | `AllowAny` (kể cả chưa đăng nhập & Customer) | Chỉ trả item có `visibility="PUBLIC"` và `status` thuộc `["PLANNED", "IN_PROGRESS", "COMPLETED"]`. Tự động loại bỏ `internal_notes`, `owner_detail` và thông tin nội bộ (`PublicRoadmapItemSerializer`). Filter: `product`, `status`. |
-| `GET` | `/api/roadmap/` | `IsInternalTeam` | Private & Public roadmap đầy đủ. Filter: `visibility`, `status`, `product`, `quarter`, `search`. |
-| `POST/PATCH/DELETE` | `/api/roadmap/{id}/` | `IsPMOrAdmin` | Tạo/cập nhật roadmap item: `{ "product", "title", "description", "public_description", "internal_notes", "status", "visibility", "quarter", "target_start_date", "target_end_date", "progress_percent": 0..100, "owner", "insight_group_ids": [] }`. |
-| `GET/POST` | `/api/roadmap/{id}/comments/` | `IsInternalTeam` | Thảo luận nội bộ trên roadmap item. |
-
----
-
-### 2.7. Notifications & Audit Logs (`apps.notifications`)
+### 3.4. Feedback Inbox & Multi-source Hub (`apps.feedbacks`)
+- Row-level RBAC: `CUSTOMER` chỉ xem phản hồi của mình; `DEVELOPER` chỉ xem mục được gán trực tiếp hoặc thuộc insight được gán cho mình.
 
 | Method | Endpoint | Quyền | Mô tả |
 |---|---|---|---|
-| `GET` | `/api/notifications/` | `IsAuthenticated` (chỉ trả về `recipient = request.user`) | Filter: `unread_only=true`, `event_type`. Customer chỉ nhận thông báo về feedback của mình hoặc roadmap public. |
-| `GET` | `/api/notifications/unread_count/` | `IsAuthenticated` | `{ "unread_count": 3 }` |
+| `POST` | `/api/sources/ingest/` | `require_feature("sources")` | Tiếp nhận phản hồi đa nguồn (`WEB_FORM`, `EMAIL`, `LIVE_CHAT`, `COMMUNITY`). |
+| `GET/POST` | `/api/feedbacks/` | `require_feature("inbox", "kanban")` | Lọc (`search`, `status`, `source`, `impact_level`, `priority_level`, `product`, `assigned_to`, `tag`, `date_from`, `date_to`, `unclustered_only`, `duplicate_only`, `mine_only`), sắp xếp và tạo mới. |
+| `GET/PATCH/DELETE` | `/api/feedbacks/{id}/` | `require_feature("inbox", "kanban")` + RBAC theo role | Xem, sửa (Customer chỉ sửa được title/content/impact khi `NEW`), hoặc xóa theo quyền. |
+| `POST` | `/api/feedbacks/{id}/assign/` | `ADMIN`, `PM`, `CS` | `{ "assigned_to": user_id \| null }`. |
+| `POST` | `/api/feedbacks/{id}/tags/` | `IsInternalTeam` | `{ "tag_ids": [1, 2] }`. |
+| `POST` | `/api/feedbacks/{id}/summarize/` | `IsInternalTeam` | Gọi AI Service tạo & lưu `ai_summary` cho 1 feedback. |
+| `GET` | `/api/feedbacks/{id}/similar/` | `IsInternalTeam` | Gọi AI `/similarity/search` tìm các feedback tương tự nhất. |
+| `POST` | `/api/feedbacks/{id}/mark_duplicate/` | `ADMIN`, `PM`, `CS` | Đánh dấu trùng lặp với `duplicate_of_id`. |
+| `POST` | `/api/feedbacks/{id}/unmark_duplicate/` | `IsInternalTeam` | Gỡ đánh dấu / gợi ý trùng lặp. |
+| `POST` | `/api/feedbacks/{id}/vote/` | `require_feature("inbox", "kanban")` | Bật/tắt vote cho feedback. |
+
+### 3.5. AI Insight Engine & Kanban (`apps.insights`)
+| Method | Endpoint | Quyền | Mô tả |
+|---|---|---|---|
+| `POST` | `/api/ai/analyze/` | `require_feature("ai_run")` | Chạy AI pipeline (`similarity_threshold`, `eps`, `min_samples`, `use_llm`, `include_clustered`). Trả `200` (sync) hoặc `202` `{ "status": "QUEUED", "task_id" }` (Celery). |
+| `GET` | `/api/ai/tasks/{task_id}/` | `require_feature("ai_run", "insights")` | Kiểm tra trạng thái & kết quả task Celery (`PENDING`, `STARTED`, `SUCCESS`, `FAILURE`). |
+| `GET` | `/api/ai/duplicates/` | `require_feature("insights")` | Danh sách cặp feedback nghi trùng lặp chưa xác nhận. |
+| `GET` | `/api/ai/unassigned/` | `require_feature("insights")` | Danh sách tối đa 100 feedback chưa thuộc nhóm Insight nào. |
+| `GET/POST/PATCH/DELETE` | `/api/insights/` | `require_feature("insights", "kanban", "roadmap")` / `IsPMOrAdmin` | Danh sách, chi tiết, tạo thủ công, chỉnh sửa `priority_score`/`title`/`description`. |
+| `POST` | `/api/insights/{id}/confirm/` & `reject/` | `IsPMOrAdmin` | Xác nhận hoặc từ chối nhóm Insight đề xuất. |
+| `POST` | `/api/insights/{id}/add_feedbacks/` & `remove_feedback/` | `IsPMOrAdmin` | Thêm/gỡ feedback khỏi nhóm & tự tính lại điểm. |
+| `POST` | `/api/insights/{id}/merge/` & `split/` | `IsPMOrAdmin` | Gộp 2 nhóm Insight hoặc tách feedback sang nhóm mới. |
+| `POST` | `/api/insights/{id}/move_kanban/` | `require_feature("kanban")` | Chuyển cột `NEW` / `REVIEWING` / `PLANNED` / `DONE` & phân công. |
+| `POST` | `/api/insights/{id}/regenerate_reply/` | `IsInternalTeam` | Tạo lại nháp phản hồi khách hàng theo tone (`empathetic`, `update`, `resolved`). |
+| `POST` | `/api/insights/{id}/vote/` | `require_feature("insights", "kanban", "roadmap")` | Bật/tắt vote cho nhóm Insight. |
+
+### 3.6. Product Roadmap & Notifications (`apps.roadmap`, `apps.notifications`)
+| Method | Endpoint | Quyền | Mô tả |
+|---|---|---|---|
+| `GET` | `/api/roadmap/public/` | `AllowAny` | Chỉ trả item `PUBLIC` & trạng thái `PLANNED`/`IN_PROGRESS`/`COMPLETED` (dùng `PublicRoadmapItemSerializer`). |
+| `GET/POST/PATCH/DELETE` | `/api/roadmap/` | `require_feature("roadmap")` / `IsPMOrAdmin` | Quản lý hạng mục Private & Public Roadmap. |
+| `GET` | `/api/notifications/` | `IsAuthenticated` | Thông báo cá nhân (`recipient=request.user`), filter `unread_only`, `event_type`. |
+| `GET` | `/api/notifications/unread_count/` | `IsAuthenticated` | `{ "unread_count": int }`. |
 | `POST` | `/api/notifications/{id}/mark_read/` | `IsAuthenticated` | Đánh dấu 1 thông báo đã đọc. |
-| `POST` | `/api/notifications/mark_all_read/` | `IsAuthenticated` | Đánh dấu toàn bộ thông báo của user hiện tại đã đọc. |
-| `GET` | `/api/activity-logs/` | `IsInternalTeam` | Nhật ký hệ thống; filter `entity_type`, `entity_id`. |
+| `POST` | `/api/notifications/mark_all_read/` | `IsAuthenticated` | Đánh dấu tất cả thông báo đã đọc. |
 
 ---
 
-## 3. FastAPI AI Microservice API
+## 4. FastAPI AI Microservice API (`ai_service/`)
 
-| Method | Endpoint | Header | Request chính | Response chính |
-|---|---|---|---|---|
-| `GET` | `/health` | — | — | `{ "status": "ok", "service": "insighthub-ai-service", "provider", "openai_configured", "anthropic_configured" }` |
-| `POST` | `/embed` | `X-API-Key` | `{ "items": [FeedbackInput...], "use_llm": true }` | `{ "embedding_model", "embeddings": [{ "feedback_id", "normalized_text", "embedding", "embedding_model" }] }` |
-| `POST` | `/similarity/search` | `X-API-Key` | `{ "target": FeedbackInput, "candidates": [...], "top_k": 5, "min_similarity": 0.35, "use_llm": true }` | `{ "embedding_model", "matches": [{ "feedback_id", "code", "title", "similarity_score", "is_exact_normalized_match" }] }` |
-| `POST` | `/summarize` | `X-API-Key` | `{ "feedbacks": [FeedbackInput...], "total_inbox_count"?, "use_llm": true, "custom_title"? }` | `{ "title", "summary", "possible_causes", "user_impact", "ai_recommendations", "draft_customer_reply", "analysis_mode", "ai_confidence", "volume_score", "impact_score", "severity_score", "priority_score", "priority_level", "priority_reasoning", "affected_customers_count" }` |
-| `POST` | `/draft-reply` | `X-API-Key` | `{ "insight_title", "insight_summary", "sample_feedbacks": [...], "tone": "empathetic"\|"update"\|"resolved", "use_llm": true }` | `{ "draft_reply", "analysis_mode", "tone" }` |
-| `POST` | `/analyze` | `X-API-Key` | `{ "feedbacks": [FeedbackInput...], "similarity_threshold": 0.72, "eps": 0.48, "min_samples": 2, "use_llm": true, "total_inbox_count"? }` | `{ "embedding_model", "analysis_mode", "embeddings", "duplicate_candidates", "clusters", "unassigned_feedback_ids", "stats" }` |
-
-### Mô hình `FeedbackInput`
-```json
-{
-  "id": 43,
-  "code": "FB-0043",
-  "title": "Lỗi thanh toán MoMo báo timeout",
-  "content": "Đơn hàng 185k bị trừ tiền trên MoMo nhưng app vẫn báo lỗi timeout.",
-  "impact_level": "CRITICAL",
-  "votes_count": 3,
-  "sender_email": "customer1@gmail.com",
-  "sender_name": "Nguyễn Minh An",
-  "source_code": "LIVE_CHAT",
-  "submitted_at": "2026-11-12T10:30:00Z"
-}
-```
+| Method | Endpoint | Header | Mô tả |
+|---|---|---|---|
+| `GET` | `/health` | — | Kiểm tra trạng thái AI Service và cấu hình OpenAI/Anthropic. |
+| `POST` | `/embed` | `X-API-Key` | Tạo embedding vectors chuẩn hóa L2 cho danh sách feedback. |
+| `POST` | `/similarity/search` | `X-API-Key` | Tìm top-k feedback tương đồng theo Cosine Similarity. |
+| `POST` | `/summarize` | `X-API-Key` | Tóm tắt vấn đề, nguyên nhân giả thuyết, đề xuất, nháp phản hồi & chấm điểm `0.4V + 0.35I + 0.25S`. |
+| `POST` | `/draft-reply` | `X-API-Key` | Sinh nháp thư phản hồi khách hàng theo tone. |
+| `POST` | `/analyze` | `X-API-Key` | Chạy toàn bộ pipeline 6 bước (Preprocess → Embed → Similarity → DBSCAN → Summarize → Scoring). |

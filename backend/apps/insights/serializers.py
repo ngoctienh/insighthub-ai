@@ -1,10 +1,9 @@
 from rest_framework import serializers
 
 from apps.accounts.serializers import UserMinimalSerializer
-from apps.feedbacks.models import Feedback
 from apps.notifications.models import Vote
 from apps.roadmap.models import RoadmapItem
-from .models import AIAnalysisJob, InsightFeedback, InsightGroup
+from .models import InsightFeedback, InsightGroup
 
 
 class InsightMemberSerializer(serializers.ModelSerializer):
@@ -17,7 +16,7 @@ class InsightMemberSerializer(serializers.ModelSerializer):
     source_code = serializers.CharField(source="feedback.source.code", read_only=True)
     impact_level = serializers.CharField(source="feedback.impact_level", read_only=True)
     status = serializers.CharField(source="feedback.status", read_only=True)
-    submitted_at = serializers.DateTimeField(source="feedback.submitted_at", read_only=True)
+    created_at = serializers.DateTimeField(source="feedback.created_at", read_only=True)
 
     class Meta:
         model = InsightFeedback
@@ -33,8 +32,7 @@ class InsightMemberSerializer(serializers.ModelSerializer):
             "impact_level",
             "status",
             "similarity_to_centroid",
-            "added_by_ai",
-            "submitted_at",
+            "created_at",
         ]
 
 
@@ -47,6 +45,7 @@ class LinkedRoadmapBriefSerializer(serializers.ModelSerializer):
 class InsightGroupListSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     assigned_to_detail = UserMinimalSerializer(source="assigned_to", read_only=True)
+    affected_customers_count = serializers.IntegerField(read_only=True)
     votes_count = serializers.SerializerMethodField()
     user_has_voted = serializers.SerializerMethodField()
 
@@ -64,20 +63,15 @@ class InsightGroupListSerializer(serializers.ModelSerializer):
             "volume_score",
             "impact_score",
             "severity_score",
-            "is_priority_overridden",
             "status",
             "verification_status",
-            "analysis_mode",
-            "ai_confidence",
             "feedback_count",
             "affected_customers_count",
             "assigned_to",
             "assigned_to_detail",
-            "due_date",
             "votes_count",
             "user_has_voted",
             "created_at",
-            "updated_at",
         ]
 
     def get_votes_count(self, obj: InsightGroup) -> int:
@@ -94,18 +88,14 @@ class InsightGroupListSerializer(serializers.ModelSerializer):
 class InsightGroupDetailSerializer(InsightGroupListSerializer):
     members = InsightMemberSerializer(source="insight_feedback_links", many=True, read_only=True)
     roadmap_items = LinkedRoadmapBriefSerializer(many=True, read_only=True)
-    created_by_detail = UserMinimalSerializer(source="created_by", read_only=True)
+    priority_reasoning = serializers.CharField(read_only=True)
 
     class Meta(InsightGroupListSerializer.Meta):
         fields = InsightGroupListSerializer.Meta.fields + [
             "possible_causes",
-            "user_impact",
             "ai_recommendations",
             "draft_customer_reply",
             "priority_reasoning",
-            "pm_priority_notes",
-            "created_by",
-            "created_by_detail",
             "members",
             "roadmap_items",
         ]
@@ -126,42 +116,15 @@ class InsightGroupWriteSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "possible_causes",
-            "user_impact",
             "ai_recommendations",
             "draft_customer_reply",
+            "priority_score",
+            "priority_level",
             "status",
             "verification_status",
             "assigned_to",
-            "due_date",
             "feedback_ids",
         ]
-
-
-class AIAnalysisJobSerializer(serializers.ModelSerializer):
-    triggered_by_detail = UserMinimalSerializer(source="triggered_by", read_only=True)
-    product_name = serializers.SerializerMethodField()
-
-    class Meta:
-        model = AIAnalysisJob
-        fields = [
-            "id",
-            "product",
-            "product_name",
-            "triggered_by",
-            "triggered_by_detail",
-            "status",
-            "config",
-            "metrics",
-            "duplicate_candidates",
-            "unassigned_feedback_ids",
-            "analysis_mode",
-            "error_message",
-            "created_at",
-            "completed_at",
-        ]
-
-    def get_product_name(self, obj: AIAnalysisJob) -> str:
-        return obj.product.name if obj.product_id else "Tất cả sản phẩm"
 
 
 class RunAIPipelineSerializer(serializers.Serializer):

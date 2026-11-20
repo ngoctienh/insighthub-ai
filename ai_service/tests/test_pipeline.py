@@ -1,9 +1,15 @@
+import os
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 
 client = TestClient(app)
+
+
+def _auth_headers() -> dict[str, str]:
+    key = os.getenv("AI_SERVICE_API_KEY", "").strip()
+    return {"X-API-Key": key} if key else {}
 
 
 def test_health_endpoint():
@@ -84,7 +90,7 @@ def test_full_analyze_pipeline_vietnamese_food_delivery():
         ],
     }
 
-    resp = client.post("/analyze", json=payload)
+    resp = client.post("/analyze", json=payload, headers=_auth_headers())
     assert resp.status_code == 200
     data = resp.json()
 
@@ -117,6 +123,7 @@ def test_full_analyze_pipeline_vietnamese_food_delivery():
 def test_similarity_search_and_draft_reply():
     sim_resp = client.post(
         "/similarity/search",
+        headers=_auth_headers(),
         json={
             "target": {
                 "id": 10,
@@ -150,6 +157,7 @@ def test_similarity_search_and_draft_reply():
 
     reply_resp = client.post(
         "/draft-reply",
+        headers=_auth_headers(),
         json={
             "insight_title": "Thiếu thông báo khi tài xế tới",
             "insight_summary": "Nhiều người dùng không nhận được push notification.",
