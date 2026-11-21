@@ -58,6 +58,7 @@ VISIBILITY_LABELS = {
 EVENT_LABELS = {
     "FEEDBACK_RECEIVED": "Tiếp nhận mới",
     "FEEDBACK_ASSIGNED": "Phân công xử lý",
+    "FEEDBACK_REPLIED": "Phản hồi trực tiếp",
     "STATUS_CHANGED": "Đổi trạng thái",
     "INSIGHT_CONFIRMED": "Xác nhận Insight",
     "ROADMAP_UPDATED": "Cập nhật Roadmap",

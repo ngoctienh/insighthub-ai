@@ -129,6 +129,11 @@
                 <span class="text-xs font-mono font-bold text-brand-600">{{ fb.code }}</span>
                 {% status_badge fb.status %}
                 {% priority_badge fb.impact_level %}
+                {% if fb.replies.count > 0 %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-700">
+                    {{ fb.replies.count }} trao đổi
+                  </span>
+                {% endif %}
               </div>
               <span class="text-xs text-slate-400">{{ fb.created_at|date:"d/m/Y" }}</span>
             </div>

@@ -21,6 +21,7 @@ from .serializers import (
     RunAIPipelineSerializer,
 )
 from .services import (
+    broadcast_insight_reply,
     classify_priority_level,
     execute_ai_pipeline,
     get_ai_task_status,
@@ -255,6 +256,22 @@ class InsightGroupViewSet(viewsets.ModelViewSet):
                 {"detail": f"Không thể gọi AI Service để tạo nháp phản hồi: {exc}"},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated, IsInternalTeam])
+    def send_reply(self, request, pk=None):
+        insight = self.get_object()
+        message = request.data.get("message", "") or insight.draft_customer_reply
+        try:
+            stats = broadcast_insight_reply(insight, request.user, message, save_draft=True)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                **stats,
+                "draft_customer_reply": insight.draft_customer_reply,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["post"])
     def vote(self, request, pk=None):

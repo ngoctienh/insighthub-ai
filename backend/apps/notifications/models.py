@@ -42,6 +42,7 @@ class Vote(models.Model):
 class Notification(models.Model):
     EVENT_FEEDBACK_RECEIVED = "FEEDBACK_RECEIVED"
     EVENT_FEEDBACK_ASSIGNED = "FEEDBACK_ASSIGNED"
+    EVENT_FEEDBACK_REPLIED = "FEEDBACK_REPLIED"
     EVENT_STATUS_CHANGED = "STATUS_CHANGED"
     EVENT_INSIGHT_CONFIRMED = "INSIGHT_CONFIRMED"
     EVENT_ROADMAP_UPDATED = "ROADMAP_UPDATED"
@@ -50,6 +51,7 @@ class Notification(models.Model):
     EVENT_CHOICES = [
         (EVENT_FEEDBACK_RECEIVED, "Feedback Received"),
         (EVENT_FEEDBACK_ASSIGNED, "Feedback Assigned"),
+        (EVENT_FEEDBACK_REPLIED, "Feedback Replied"),
         (EVENT_STATUS_CHANGED, "Status Changed"),
         (EVENT_INSIGHT_CONFIRMED, "Insight Confirmed"),
         (EVENT_ROADMAP_UPDATED, "Roadmap Updated"),

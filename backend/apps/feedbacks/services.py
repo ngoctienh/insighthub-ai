@@ -11,7 +11,8 @@ from django.utils.dateparse import parse_date
 
 from apps.accounts.models import Role, User
 from apps.insights.models import InsightGroup
-from .models import Feedback
+from apps.notifications.services import notify_feedback_replied
+from .models import Feedback, FeedbackReply
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ def get_scoped_feedbacks(user: User) -> QuerySet[Feedback]:
             "author",
             "duplicate_of",
         )
-        .prefetch_related("tags", "insight_groups")
+        .prefetch_related("tags", "insight_groups", "replies__author__role")
         .annotate(annotated_votes_count=Count("votes", distinct=True))
     )
     if role == Role.CUSTOMER:
@@ -317,3 +318,25 @@ def build_dashboard_data(
         "top_5_issues": top_5_issues,
         "urgent_insights": urgent_insights,
     }
+
+
+def send_feedback_reply(feedback: Feedback, user: User, message: str) -> FeedbackReply:
+    """Persist a manual reply on a feedback thread and notify the customer/assignee."""
+    cleaned = (message or "").strip()
+    if not cleaned:
+        raise ValueError("Nội dung phản hồi không được để trống.")
+
+    is_staff_reply = user.role_code != Role.CUSTOMER
+    reply = FeedbackReply.objects.create(
+        feedback=feedback,
+        author=user,
+        is_staff_reply=is_staff_reply,
+        message=cleaned,
+    )
+    notify_feedback_replied(
+        feedback,
+        reply_message=cleaned,
+        actor=user,
+        is_staff_reply=is_staff_reply,
+    )
+    return reply

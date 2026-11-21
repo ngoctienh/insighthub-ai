@@ -99,6 +99,84 @@
       {% endif %}
     </div>
 
+    <!-- Manual Reply & Conversation Thread -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="font-bold text-slate-900 flex items-center gap-2 text-sm">
+            <i data-lucide="message-circle" class="w-4 h-4 text-brand-600"></i>
+            Phản hồi &amp; Trao đổi với khách hàng ({{ replies|length }})
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">
+            {% if is_internal %}
+              {% if fb.author_id %}
+                Gửi trả lời thủ công trực tiếp tới tài khoản {{ fb.sender_name }} và tạo thông báo ngay.
+              {% else %}
+                Lưu phản hồi chính thức cho {{ fb.code }} (kênh {{ fb.source.name }} · {{ fb.sender_email }}).
+              {% endif %}
+            {% else %}
+              Xem phản hồi từ đội ngũ sản phẩm / CSKH hoặc nhắn thêm chi tiết.
+            {% endif %}
+          </p>
+        </div>
+        {% if is_internal and linked_draft_reply %}
+          <button
+            type="button"
+            onclick="document.getElementById('feedback-reply-input').value = document.getElementById('insight-draft-seed').textContent.trim()"
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100"
+          >
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            Chèn nháp từ Insight
+          </button>
+          <span id="insight-draft-seed" class="hidden">{{ linked_draft_reply }}</span>
+        {% endif %}
+      </div>
+
+      {% if replies %}
+        <div class="space-y-3">
+          {% for r in replies %}
+            <div class="p-3.5 rounded-xl border {% if r.is_staff_reply %}bg-indigo-50/50 border-indigo-200{% else %}bg-slate-50 border-slate-200{% endif %}">
+              <div class="flex items-center justify-between gap-2 mb-1.5 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-slate-900">
+                    {% if r.author %}{{ r.author.display_name }}{% else %}Đội ngũ InsightHub{% endif %}
+                  </span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {% if r.is_staff_reply %}bg-brand-600 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">
+                    {% if r.is_staff_reply %}Đội ngũ hỗ trợ{% else %}Khách hàng{% endif %}
+                  </span>
+                </div>
+                <span class="text-slate-400">{{ r.created_at|date:"H:i d/m/Y" }}</span>
+              </div>
+              <div class="text-sm text-slate-800 whitespace-pre-line leading-relaxed">{{ r.message }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-xs text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-xl p-4 text-center">
+          Chưa có phản hồi nào. Hãy nhập nội dung bên dưới để trả lời thủ công cho khách hàng.
+        </p>
+      {% endif %}
+
+      <form method="post" action="{% url 'web-feedback-detail' fb.id %}" class="space-y-2.5 pt-1">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="send_reply" />
+        <textarea
+          id="feedback-reply-input"
+          name="message"
+          rows="3"
+          required
+          placeholder="{% if is_internal %}Nhập phản hồi thủ công gửi tới khách hàng {{ fb.sender_name }}...{% else %}Nhập thêm thông tin hoặc câu hỏi gửi tới đội ngũ hỗ trợ...{% endif %}"
+          class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
+        ></textarea>
+        <div class="flex justify-end">
+          <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 text-white text-xs sm:text-sm font-semibold hover:bg-brand-700">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            {% if is_internal %}Gửi phản hồi tới khách hàng{% else %}Gửi tin nhắn{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+
     {% if is_internal %}
       <!-- AI Similarity Search -->
       <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">

@@ -392,6 +392,42 @@ def regenerate_insight_reply(
     }
 
 
+def broadcast_insight_reply(
+    insight: InsightGroup,
+    user: User,
+    message: str,
+    save_draft: bool = True,
+) -> dict[str, int]:
+    """Save optional draft edit and send a manual reply to every feedback in this Insight."""
+    from apps.feedbacks.services import send_feedback_reply
+
+    cleaned = (message or "").strip()
+    if not cleaned:
+        raise ValueError("Nội dung phản hồi không được để trống.")
+
+    with transaction.atomic():
+        if save_draft:
+            insight.draft_customer_reply = cleaned
+            insight.save(update_fields=["draft_customer_reply"])
+
+        links = insight.insight_feedback_links.select_related("feedback__author").all()
+        sent_fb_ids: set[int] = set()
+        notified_users: set[int] = set()
+        for link in links:
+            fb = link.feedback
+            if fb.id in sent_fb_ids:
+                continue
+            sent_fb_ids.add(fb.id)
+            send_feedback_reply(fb, user, cleaned)
+            if fb.author_id and fb.author_id != user.id:
+                notified_users.add(fb.author_id)
+
+    return {
+        "sent_feedback_count": len(sent_fb_ids),
+        "notified_users_count": len(notified_users),
+    }
+
+
 def merge_insights(target: InsightGroup, source: InsightGroup) -> InsightGroup:
     with transaction.atomic():
         for link in source.insight_feedback_links.all():

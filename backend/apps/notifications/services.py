@@ -64,6 +64,55 @@ def notify_feedback_assigned(feedback, assignee: Optional[User], actor: Optional
         )
 
 
+def notify_feedback_replied(
+    feedback,
+    reply_message: str,
+    actor: Optional[User] = None,
+    is_staff_reply: bool = True,
+):
+    """Notify the customer author (or assigned staff on customer follow-up) when a manual reply is sent."""
+    preview = reply_message.strip()
+    if len(preview) > 180:
+        preview = preview[:177] + "..."
+    sender_label = actor.display_name() if actor else "Đội ngũ InsightHub"
+
+    if is_staff_reply:
+        if feedback.author_id:
+            notify_user(
+                recipient=feedback.author,
+                event_type=Notification.EVENT_FEEDBACK_REPLIED,
+                title=f"Phản hồi mới cho {feedback.code} từ {sender_label}",
+                message=preview,
+                actor=actor,
+                feedback=feedback,
+            )
+        return
+
+    if feedback.assigned_to_id:
+        notify_user(
+            recipient=feedback.assigned_to,
+            event_type=Notification.EVENT_FEEDBACK_REPLIED,
+            title=f"Khách hàng vừa nhắn thêm tại {feedback.code}",
+            message=preview,
+            actor=actor,
+            feedback=feedback,
+        )
+    else:
+        pms = User.objects.filter(
+            is_active=True,
+            role__code__in=[Role.PRODUCT_MANAGER, Role.CUSTOMER_SUPPORT],
+        )
+        for member in pms:
+            notify_user(
+                recipient=member,
+                event_type=Notification.EVENT_FEEDBACK_REPLIED,
+                title=f"Khách hàng vừa nhắn thêm tại {feedback.code}",
+                message=preview,
+                actor=actor,
+                feedback=feedback,
+            )
+
+
 def notify_feedback_status_changed(feedback, old_status: str, new_status: str, actor: Optional[User] = None):
     if old_status == new_status:
         return

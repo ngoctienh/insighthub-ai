@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Feedback, FeedbackSource, FeedbackTag, Product, Tag
+from .models import Feedback, FeedbackReply, FeedbackSource, FeedbackTag, Product, Tag
 
 
 @admin.register(Product)
@@ -28,3 +28,10 @@ class FeedbackAdmin(admin.ModelAdmin):
 @admin.register(FeedbackTag)
 class FeedbackTagAdmin(admin.ModelAdmin):
     list_display = ("feedback", "tag")
+
+
+@admin.register(FeedbackReply)
+class FeedbackReplyAdmin(admin.ModelAdmin):
+    list_display = ("feedback", "author", "is_staff_reply", "created_at")
+    list_filter = ("is_staff_reply", "created_at")
+    search_fields = ("feedback__code", "message")

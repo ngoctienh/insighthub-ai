@@ -78,15 +78,15 @@
       </div>
     </div>
 
-    <!-- AI Draft Customer Reply -->
-    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+    <!-- AI & Manual Customer Reply -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 class="font-bold text-slate-900 flex items-center gap-2 text-sm">
             <i data-lucide="sparkles" class="w-4 h-4 text-brand-600"></i>
-            AI Nháp phản hồi khách hàng
+            Phản hồi khách hàng (Thủ công &amp; AI Nháp)
           </h3>
-          <p class="text-xs text-slate-500">Sinh thư phản hồi chuẩn hóa để đội CSKH/PM xem xét trước khi gửi</p>
+          <p class="text-xs text-slate-500">Tạo nháp bằng AI, tự chỉnh sửa thủ công rồi gửi trực tiếp tới toàn bộ khách hàng trong nhóm</p>
         </div>
         <div class="flex items-center gap-2">
           <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="flex items-center gap-2">
@@ -99,15 +99,35 @@
             </select>
             <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800">
               <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-              Tạo lại
+              Tạo lại AI
             </button>
           </form>
-          <button type="button" onclick="window.copyText(document.getElementById('draft-reply-box').textContent, 'Đã sao chép nháp phản hồi!')" class="p-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50" title="Sao chép">
+          <button type="button" onclick="window.copyText(document.getElementById('draft-reply-box').value, 'Đã sao chép phản hồi!')" class="p-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50" title="Sao chép">
             <i data-lucide="copy" class="w-4 h-4"></i>
           </button>
         </div>
       </div>
-      <div id="draft-reply-box" class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 whitespace-pre-line font-normal">{{ insight.draft_customer_reply|default:"Chưa có nháp phản hồi." }}</div>
+
+      <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="space-y-3">
+        {% csrf_token %}
+        <textarea
+          id="draft-reply-box"
+          name="message"
+          rows="5"
+          placeholder="Nhập nội dung phản hồi thủ công hoặc bấm Tạo lại AI ở trên..."
+          class="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 font-normal focus:bg-white focus:border-brand-500 outline-none"
+        >{{ insight.draft_customer_reply }}</textarea>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <button type="submit" name="action" value="save_draft_reply" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50">
+            <i data-lucide="save" class="w-3.5 h-3.5"></i>
+            Lưu nháp
+          </button>
+          <button type="submit" name="action" value="send_group_reply" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700">
+            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+            Gửi tới {{ members|length }} feedback trong nhóm
+          </button>
+        </div>
+      </form>
     </div>
 
     <!-- Member Feedbacks -->

@@ -20,6 +20,7 @@ from .models import Feedback, FeedbackSource, FeedbackTag, Product, Tag
 from .serializers import (
     FeedbackDetailSerializer,
     FeedbackListSerializer,
+    FeedbackReplySerializer,
     FeedbackSourceSerializer,
     FeedbackWriteSerializer,
     MultiSourceIngestSerializer,
@@ -31,6 +32,7 @@ from .services import (
     build_dashboard_data,
     find_similar_feedbacks,
     get_scoped_feedbacks,
+    send_feedback_reply,
 )
 
 logger = logging.getLogger(__name__)
@@ -261,6 +263,22 @@ class FeedbackViewSet(viewsets.ModelViewSet):
             Vote.objects.create(user=request.user, feedback=feedback)
             voted = True
         return Response({"voted": voted, "votes_count": feedback.votes.count()})
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated, require_feature("inbox", "kanban")])
+    def reply(self, request, pk=None):
+        feedback = self.get_object()
+        try:
+            reply_obj = send_feedback_reply(
+                feedback,
+                request.user,
+                request.data.get("message", ""),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            FeedbackReplySerializer(reply_obj, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["get"], permission_classes=[permissions.IsAuthenticated, IsInternalTeam, require_feature("inbox")])
     def similar(self, request, pk=None):

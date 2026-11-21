@@ -13,6 +13,7 @@ from apps.feedbacks.models import Feedback, Product
 from apps.insights.models import InsightFeedback, InsightGroup
 from apps.insights.serializers import RunAIPipelineSerializer
 from apps.insights.services import (
+    broadcast_insight_reply,
     classify_priority_level,
     execute_ai_pipeline,
     get_ai_task_status,
@@ -267,6 +268,26 @@ def insight_detail_view(request, pk: int):
             except Exception as exc:
                 logger.warning("Regenerate reply failed for insight=%s: %s", insight.id, exc)
                 messages.error(request, f"Không thể gọi AI Service để tạo nháp phản hồi: {exc}")
+            return redirect("web-insight-detail", pk=insight.id)
+
+        if action == "save_draft_reply":
+            msg_text = request.POST.get("message", "").strip()
+            insight.draft_customer_reply = msg_text
+            insight.save(update_fields=["draft_customer_reply"])
+            messages.success(request, "Đã lưu nội dung phản hồi nháp!")
+            return redirect("web-insight-detail", pk=insight.id)
+
+        if action == "send_group_reply":
+            msg_text = request.POST.get("message", "")
+            try:
+                stats = broadcast_insight_reply(insight, request.user, msg_text, save_draft=True)
+                messages.success(
+                    request,
+                    f"Đã gửi phản hồi thủ công tới {stats['sent_feedback_count']} feedback trong nhóm "
+                    f"(thông báo cho {stats['notified_users_count']} tài khoản khách hàng).",
+                )
+            except ValueError as exc:
+                messages.error(request, str(exc))
             return redirect("web-insight-detail", pk=insight.id)
 
         if action == "move_kanban":

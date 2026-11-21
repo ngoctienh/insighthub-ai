@@ -3,7 +3,7 @@ import os
 import pytest
 
 from apps.accounts.models import Role
-from apps.feedbacks.models import Feedback, Product, Tag
+from apps.feedbacks.models import Feedback, FeedbackReply, Product, Tag
 from apps.insights.models import InsightGroup
 from apps.notifications.models import Notification
 from apps.roadmap.models import RoadmapItem
@@ -250,3 +250,70 @@ def test_api_celery_task_status_and_customer_patch_validation(api_client, seeded
     assert task_resp.status_code == 200
     assert task_resp.json()["ready"] is True
     assert task_resp.json()["state"] == "SUCCESS"
+
+
+@pytest.mark.django_db
+def test_manual_customer_reply_on_feedback_and_insight(client, api_client, seeded_db):
+    # PM posts a manual reply directly to customer_an's feedback via web view
+    cust_fb = Feedback.objects.filter(author__username="customer_an").first()
+    assert cust_fb is not None
+
+    client.post("/login/", {"identifier": "pm_minh", "password": DEMO_PASS})
+    reply_resp = client.post(
+        f"/inbox/{cust_fb.id}/",
+        {"action": "send_reply", "message": "Đội sản phẩm đã tiếp nhận và đang kiểm tra lỗi này."},
+    )
+    assert reply_resp.status_code == 302
+    assert FeedbackReply.objects.filter(feedback=cust_fb, is_staff_reply=True).count() == 1
+    assert Notification.objects.filter(
+        recipient=cust_fb.author,
+        feedback=cust_fb,
+        event_type=Notification.EVENT_FEEDBACK_REPLIED,
+    ).exists()
+
+    # PM saves & broadcasts manual reply from Insight detail to member feedbacks
+    insight = InsightGroup.objects.first()
+    assert insight is not None
+    save_resp = client.post(
+        f"/insights/{insight.id}/",
+        {"action": "save_draft_reply", "message": "Cảm ơn bạn, bản vá sẽ phát hành tuần này."},
+    )
+    assert save_resp.status_code == 302
+    insight.refresh_from_db()
+    assert insight.draft_customer_reply == "Cảm ơn bạn, bản vá sẽ phát hành tuần này."
+
+    group_resp = client.post(
+        f"/insights/{insight.id}/",
+        {"action": "send_group_reply", "message": "Phản hồi chung từ nhóm Insight."},
+    )
+    assert group_resp.status_code == 302
+    member_fb_ids = list(insight.insight_feedback_links.values_list("feedback_id", flat=True))
+    assert FeedbackReply.objects.filter(feedback_id__in=member_fb_ids, message="Phản hồi chung từ nhóm Insight.").count() == len(set(member_fb_ids))
+
+    # Customer logs in, sees staff reply on /inbox/<id>/ and /portal/, and posts a follow-up reply
+    client.post("/logout/")
+    client.post("/login/", {"identifier": "customer_an", "password": DEMO_PASS})
+    fb_page = client.get(f"/inbox/{cust_fb.id}/").content.decode("utf-8")
+    assert "Đội sản phẩm đã tiếp nhận và đang kiểm tra lỗi này." in fb_page
+
+    cust_follow = client.post(
+        f"/inbox/{cust_fb.id}/",
+        {"action": "send_reply", "message": "Cảm ơn đội ngũ, mình bị lỗi trên iOS 18."},
+    )
+    assert cust_follow.status_code == 302
+    assert FeedbackReply.objects.filter(feedback=cust_fb, is_staff_reply=False).count() == 1
+
+    # API reply endpoint works for authenticated CS user
+    cs_login = api_client.post(
+        "/api/auth/login/",
+        {"identifier": "cs_linh", "password": DEMO_PASS},
+        format="json",
+    ).json()
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {cs_login['access']}")
+    api_reply = api_client.post(
+        f"/api/feedbacks/{cust_fb.id}/reply/",
+        {"message": "CSKH đã ghi nhận thông tin iOS 18 của bạn."},
+        format="json",
+    )
+    assert api_reply.status_code == 201
+    assert api_reply.json()["is_staff_reply"] is True

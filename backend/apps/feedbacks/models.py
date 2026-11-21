@@ -190,3 +190,31 @@ class FeedbackTag(models.Model):
                 name="unique_feedback_tag",
             )
         ]
+
+
+class FeedbackReply(models.Model):
+    """Manual or team reply posted directly on a Feedback thread and notified to its author."""
+
+    feedback = models.ForeignKey(
+        Feedback,
+        on_delete=models.CASCADE,
+        related_name="replies",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="feedback_replies",
+    )
+    is_staff_reply = models.BooleanField(default=True)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "feedback_replies"
+        ordering = ["created_at", "id"]
+
+    def __str__(self) -> str:
+        who = self.author.display_name() if self.author else "Hệ thống"
+        return f"Reply on {self.feedback.code} by {who}"

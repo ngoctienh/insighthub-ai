@@ -5,7 +5,7 @@ from apps.accounts.models import Role
 from apps.accounts.serializers import UserMinimalSerializer
 from apps.insights.models import InsightGroup
 from apps.notifications.models import Vote
-from .models import Feedback, FeedbackSource, FeedbackTag, Product, Tag
+from .models import Feedback, FeedbackReply, FeedbackSource, FeedbackTag, Product, Tag
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -122,14 +122,33 @@ class FeedbackListSerializer(serializers.ModelSerializer):
         return Vote.objects.filter(user=user, feedback=obj).exists()
 
 
+class FeedbackReplySerializer(serializers.ModelSerializer):
+    author_detail = UserMinimalSerializer(source="author", read_only=True)
+
+    class Meta:
+        model = FeedbackReply
+        fields = [
+            "id",
+            "feedback",
+            "author",
+            "author_detail",
+            "is_staff_reply",
+            "message",
+            "created_at",
+        ]
+        read_only_fields = ["id", "feedback", "author", "is_staff_reply", "created_at"]
+
+
 class FeedbackDetailSerializer(FeedbackListSerializer):
     duplicate_of_detail = DuplicateSummarySerializer(source="duplicate_of", read_only=True)
     author_detail = UserMinimalSerializer(source="author", read_only=True)
+    replies = FeedbackReplySerializer(many=True, read_only=True)
 
     class Meta(FeedbackListSerializer.Meta):
         fields = FeedbackListSerializer.Meta.fields + [
             "duplicate_of_detail",
             "author_detail",
+            "replies",
         ]
 
 

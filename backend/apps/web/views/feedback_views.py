@@ -17,6 +17,7 @@ from apps.feedbacks.services import (
     build_dashboard_data,
     find_similar_feedbacks,
     get_scoped_feedbacks,
+    send_feedback_reply,
 )
 from apps.insights.services import summarize_single_feedback
 from apps.notifications.models import Notification, Vote
@@ -243,6 +244,21 @@ def feedback_detail_view(request, pk: int):
                 return JsonResponse({"voted": voted, "votes_count": fb.votes.count()})
             return redirect("web-feedback-detail", pk=fb.id)
 
+        if action == "send_reply":
+            msg_text = request.POST.get("message", "")
+            try:
+                send_feedback_reply(fb, request.user, msg_text)
+                if is_internal:
+                    if fb.author_id:
+                        messages.success(request, f"Đã gửi phản hồi thủ công tới {fb.sender_name} và tạo thông báo!")
+                    else:
+                        messages.success(request, f"Đã lưu phản hồi thủ công cho {fb.code} ({fb.sender_email}).")
+                else:
+                    messages.success(request, "Đã gửi tin nhắn tới đội ngũ hỗ trợ!")
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            return redirect("web-feedback-detail", pk=fb.id)
+
         if action == "edit_customer_feedback":
             if role != Role.CUSTOMER or fb.author_id != request.user.id or fb.status != Feedback.STATUS_NEW:
                 return render_forbidden(request, "Chỉ có thể chỉnh sửa phản hồi của mình khi trạng thái là NEW.")
@@ -369,6 +385,8 @@ def feedback_detail_view(request, pk: int):
         else []
     )
     all_tags = list(Tag.objects.all()) if is_internal else []
+    replies = list(fb.replies.select_related("author__role").all())
+    linked_ins = fb.insight_groups.exclude(draft_customer_reply="").first() if is_internal else None
 
     return render(
         request,
@@ -382,6 +400,8 @@ def feedback_detail_view(request, pk: int):
             "can_assign": can_assign,
             "similar_matches": similar_matches,
             "similarity_ran": similarity_ran,
+            "replies": replies,
+            "linked_draft_reply": linked_ins.draft_customer_reply if linked_ins else "",
             "kanban_statuses": [
                 ("NEW", "Mới"),
                 ("REVIEWING", "Đang xem xét"),
