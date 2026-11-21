@@ -20,7 +20,7 @@
         <thead>
           <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
             <th class="py-3 px-4">Thành viên</th>
-            <th class="py-3 px-4">Vai trò (Role)</th>
+            <th class="py-3 px-4">Vai trò</th>
             <th class="py-3 px-4">Chức danh</th>
             <th class="py-3 px-4">Trạng thái</th>
             {% if is_admin %}<th class="py-3 px-4 text-right">Thao tác</th>{% endif %}
@@ -159,7 +159,7 @@
         {% csrf_token %}
         <input type="hidden" name="action" id="usr-action" value="create_user" />
         <input type="hidden" name="user_id" id="usr-id" value="" />
-        <input type="text" name="username" id="usr-username" required placeholder="Username" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm disabled:bg-slate-100" />
+        <input type="text" name="username" id="usr-username" required placeholder="Tên đăng nhập" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm disabled:bg-slate-100" />
         <input type="text" name="full_name" id="usr-full-name" required placeholder="Họ và tên" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
         <input type="email" name="email" id="usr-email" required placeholder="Email" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
         <select name="role_code" id="usr-role" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">

@@ -51,19 +51,19 @@ def public_roadmap_view(request):
     columns = [
         {
             "status": "PLANNED",
-            "title": "Planned — Đã lên kế hoạch",
+            "title": "Đã lên kế hoạch",
             "badge": "bg-amber-50 text-amber-800 border-amber-200",
             "items": [i for i in sanitized_items if i["status"] == "PLANNED"],
         },
         {
             "status": "IN_PROGRESS",
-            "title": "In Progress — Đang phát triển",
+            "title": "Đang phát triển",
             "badge": "bg-blue-50 text-blue-800 border-blue-200",
             "items": [i for i in sanitized_items if i["status"] == "IN_PROGRESS"],
         },
         {
             "status": "COMPLETED",
-            "title": "Completed — Đã ra mắt",
+            "title": "Đã ra mắt",
             "badge": "bg-emerald-50 text-emerald-800 border-emerald-200",
             "items": [i for i in sanitized_items if i["status"] == "COMPLETED"],
         },

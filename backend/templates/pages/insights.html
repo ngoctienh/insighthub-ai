@@ -1,9 +1,9 @@
 {% extends "layouts/app.html" %}
 {% load web_tags %}
 
-{% block title %}AI Insight Engine — InsightHub AI{% endblock %}
-{% block page_title %}AI Insight Engine{% endblock %}
-{% block page_subtitle %}Embedding Vector · Cosine Similarity · DBSCAN Clustering · Summarization · Priority Scoring (0.4V + 0.35I + 0.25S){% endblock %}
+{% block title %}Nhóm Insight AI — InsightHub AI{% endblock %}
+{% block page_title %}Phân tích &amp; Gom nhóm Insight AI{% endblock %}
+{% block page_subtitle %}Vector Embedding · Độ tương đồng Cosine · Gom cụm DBSCAN · Tóm tắt &amp; Chấm điểm ưu tiên (0.4V + 0.35I + 0.25S){% endblock %}
 {% block page_actions %}
   <a href="{% url 'web-insights' %}?tab={{ active_tab }}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm font-medium hover:bg-slate-50">
     <i data-lucide="refresh-cw" class="w-4 h-4"></i>
@@ -21,13 +21,13 @@
       <div>
         <div class="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-1">
           <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-          Điều khiển AI Clustering Pipeline
+          Bảng điều khiển Phân tích AI
         </div>
         <h2 class="text-lg font-bold">Phân tích &amp; Gom nhóm {{ unassigned|length }} feedback chưa phân loại</h2>
-        <p class="text-xs text-slate-300 mt-0.5">Hỗ trợ tùy chỉnh ngưỡng Cosine Similarity &amp; tham số DBSCAN trước khi sinh Insight.</p>
+        <p class="text-xs text-slate-300 mt-0.5">Hỗ trợ tùy chỉnh ngưỡng tương đồng Cosine &amp; tham số DBSCAN trước khi sinh Insight.</p>
         <div id="ai-polling-banner" class="{% if not queued_task_id %}hidden{% endif %} mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-xs text-indigo-100">
           <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-          <span id="ai-polling-text">AI Worker (Celery) đang xử lý tác vụ ngầm...</span>
+          <span id="ai-polling-text">Tiến trình nền (Celery) đang phân tích dữ liệu...</span>
         </div>
       </div>
 
@@ -91,9 +91,9 @@
           <p class="text-sm text-slate-600 mt-1.5 line-clamp-3">{{ ins.description }}</p>
 
           <div class="mt-4 grid grid-cols-3 gap-2 text-center bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-            <div><div class="text-[11px] text-slate-500">Volume (40%)</div><div class="text-sm font-bold text-slate-900">{{ ins.volume_score }}</div></div>
-            <div><div class="text-[11px] text-slate-500">Impact (35%)</div><div class="text-sm font-bold text-slate-900">{{ ins.impact_score }}</div></div>
-            <div><div class="text-[11px] text-slate-500">Severity (25%)</div><div class="text-sm font-bold text-slate-900">{{ ins.severity_score }}</div></div>
+            <div><div class="text-[11px] text-slate-500">Số lượng (40%)</div><div class="text-sm font-bold text-slate-900">{{ ins.volume_score }}</div></div>
+            <div><div class="text-[11px] text-slate-500">Tác động (35%)</div><div class="text-sm font-bold text-slate-900">{{ ins.impact_score }}</div></div>
+            <div><div class="text-[11px] text-slate-500">Nghiêm trọng (25%)</div><div class="text-sm font-bold text-slate-900">{{ ins.severity_score }}</div></div>
           </div>
         </div>
 
@@ -144,7 +144,7 @@
     <div class="mb-4">
       <h3 class="font-bold text-slate-900 flex items-center gap-2">
         <i data-lucide="copy" class="w-4 h-4 text-brand-600"></i>
-        Kiểm duyệt các cặp Feedback có Cosine Similarity cao
+        Kiểm duyệt các cặp Feedback nghi trùng lặp
       </h3>
       <p class="text-xs text-slate-500 mt-1">AI gợi ý ứng viên dựa trên độ tương đồng vector. PM/Admin kiểm tra để xác nhận hoặc bỏ qua.</p>
     </div>
@@ -158,7 +158,7 @@
               <div><a href="{% url 'web-feedback-detail' pair.feedback_a_id %}" class="font-semibold text-brand-600 hover:underline">{{ pair.feedback_a_code }}: {{ pair.feedback_a_title }}</a></div>
               <div><a href="{% url 'web-feedback-detail' pair.feedback_b_id %}" class="font-semibold text-slate-900 hover:underline">{{ pair.feedback_b_code }}: {{ pair.feedback_b_title }}</a></div>
               <div class="text-xs text-slate-500">
-                Cosine Similarity: <strong>{{ pair.similarity_score|mul100 }}%</strong>
+                Độ tương đồng Cosine: <strong>{{ pair.similarity_score|mul100 }}%</strong>
                 {% if pair.is_exact_normalized_match %} · Trùng văn bản chuẩn hóa{% endif %}
               </div>
             </div>

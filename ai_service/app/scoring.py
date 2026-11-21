@@ -23,6 +23,14 @@ _SEVERE_FAILURE_PATTERN = re.compile(
 )
 
 
+_PRIORITY_LABELS = {
+    "CRITICAL": "Nghiêm trọng",
+    "HIGH": "Cao",
+    "MEDIUM": "Trung bình",
+    "LOW": "Thấp",
+}
+
+
 def classify_priority(score: float) -> PriorityLevel:
     if score >= 80.0:
         return "CRITICAL"
@@ -100,14 +108,15 @@ def calculate_priority_score(
         1,
     )
     priority_level = classify_priority(priority_score)
+    priority_label = _PRIORITY_LABELS.get(priority_level, priority_level)
 
     reasoning = (
-        f"Điểm tổng hợp {priority_score}/100 ({priority_level}) = "
-        f"0.40×V({volume_score}) + 0.35×I({impact_score}) + 0.25×S({severity_score}). "
+        f"Điểm tổng hợp {priority_score}/100 ({priority_label}) = "
+        f"0.40×Số lượng({volume_score}) + 0.35×Tác động({impact_score}) + 0.25×Nghiêm trọng({severity_score}). "
         f"Nhóm gồm {cluster_size} feedback từ {affected_customers_count} khách hàng "
-        f"(tổng {total_votes} lượt bình chọn); có {critical_count} báo cáo mức Critical, "
-        f"{high_or_critical}/{cluster_size} báo cáo mức High/Critical và "
-        f"{severe_hits}/{cluster_size} phản hồi chứa dấu hiệu lỗi/chặn luồng nghiêm trọng."
+        f"(tổng {total_votes} lượt bình chọn); có {critical_count} báo cáo mức Nghiêm trọng, "
+        f"{high_or_critical}/{cluster_size} báo cáo mức Cao/Nghiêm trọng và "
+        f"{severe_hits}/{cluster_size} phản hồi chứa dấu hiệu lỗi hoặc chặn luồng nghiêm trọng."
     )
 
     return {

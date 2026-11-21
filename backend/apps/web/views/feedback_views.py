@@ -26,6 +26,7 @@ from apps.notifications.services import (
     notify_feedback_status_changed,
 )
 from apps.web.decorators import is_json_request, render_forbidden, web_feature_required
+from apps.web.templatetags.web_tags import STATUS_LABELS
 from .helpers import format_serializer_error
 
 logger = logging.getLogger(__name__)
@@ -275,7 +276,7 @@ def feedback_detail_view(request, pk: int):
                 fb.status = new_status
                 fb.save(update_fields=["status", "updated_at"])
                 notify_feedback_status_changed(fb, old_status, new_status, actor=request.user)
-                messages.success(request, f"Đã chuyển trạng thái sang {new_status}.")
+                messages.success(request, f"Đã chuyển trạng thái sang {STATUS_LABELS.get(new_status, new_status)}.")
             return redirect("web-feedback-detail", pk=fb.id)
 
         if action == "assign":
@@ -381,7 +382,12 @@ def feedback_detail_view(request, pk: int):
             "can_assign": can_assign,
             "similar_matches": similar_matches,
             "similarity_ran": similarity_ran,
-            "kanban_statuses": [("NEW", "New"), ("REVIEWING", "Reviewing"), ("PLANNED", "Planned"), ("DONE", "Done")],
+            "kanban_statuses": [
+                ("NEW", "Mới"),
+                ("REVIEWING", "Đang xem xét"),
+                ("PLANNED", "Đã lên kế hoạch"),
+                ("DONE", "Hoàn thành"),
+            ],
         },
     )
 

@@ -2,7 +2,7 @@
 {% load web_tags %}
 
 {% block title %}Dashboard — InsightHub AI{% endblock %}
-{% block page_title %}Product Discovery Dashboard{% endblock %}
+{% block page_title %}Dashboard Tổng quan{% endblock %}
 {% block page_subtitle %}Tổng quan phản hồi đa nguồn, nhóm Insight AI và mức độ ưu tiên từ PostgreSQL{% endblock %}
 {% block page_actions %}
   <form method="get" class="flex flex-wrap items-center gap-2">
@@ -68,7 +68,7 @@
 
     <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
       <h2 class="font-bold text-slate-900">Phân bổ theo Nguồn tiếp nhận</h2>
-      <p class="text-xs text-slate-500 mb-3">Website Form, Email, Live Chat, Cộng đồng</p>
+      <p class="text-xs text-slate-500 mb-3">Form Web, Email, Live Chat, Cộng đồng</p>
       <div class="h-48"><canvas id="chart-by-source"></canvas></div>
       <div class="grid grid-cols-2 gap-2 mt-3">
         {% for src in data.feedbacks_by_source %}
@@ -85,12 +85,12 @@
   <div class="grid lg:grid-cols-2 gap-6">
     <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
       <h2 class="font-bold text-slate-900">Thống kê Feedback theo Trạng thái</h2>
-      <p class="text-xs text-slate-500 mb-4">New · Reviewing · Planned · Done · Duplicate</p>
+      <p class="text-xs text-slate-500 mb-4">Mới · Đang xem xét · Đã lên kế hoạch · Hoàn thành · Trùng lặp</p>
       <div class="h-56"><canvas id="chart-by-status"></canvas></div>
     </div>
 
     <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-      <h2 class="font-bold text-slate-900">Thống kê Feedback theo Tag / Danh mục</h2>
+      <h2 class="font-bold text-slate-900">Thống kê Feedback theo Tag / Chủ đề</h2>
       <p class="text-xs text-slate-500 mb-4">Phân bổ chủ đề phản hồi</p>
       <div class="h-56"><canvas id="chart-by-tag"></canvas></div>
     </div>
@@ -100,7 +100,7 @@
   <div class="grid lg:grid-cols-3 gap-6">
     <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
       <h2 class="font-bold text-slate-900">Insight theo Mức độ Ưu tiên</h2>
-      <p class="text-xs text-slate-500 mb-4">Phân loại theo điểm Priority (0–100)</p>
+      <p class="text-xs text-slate-500 mb-4">Phân loại theo điểm ưu tiên (0–100)</p>
       <div class="h-60"><canvas id="chart-by-priority"></canvas></div>
     </div>
 
@@ -185,6 +185,8 @@
     const sourceColors = { WEB_FORM: "#4f46e5", EMAIL: "#0891b2", LIVE_CHAT: "#10b981", COMMUNITY: "#8b5cf6" };
     const statusColors = { NEW: "#0ea5e9", REVIEWING: "#8b5cf6", PLANNED: "#f59e0b", DONE: "#10b981", DUPLICATE: "#71717a" };
     const priorityColors = { CRITICAL: "#e11d48", HIGH: "#f97316", MEDIUM: "#eab308", LOW: "#64748b" };
+    const statusLabels = { NEW: "Mới", REVIEWING: "Đang xem xét", PLANNED: "Đã lên kế hoạch", DONE: "Hoàn thành", DUPLICATE: "Trùng lặp" };
+    const priorityLabels = { CRITICAL: "Nghiêm trọng", HIGH: "Cao", MEDIUM: "Trung bình", LOW: "Thấp" };
 
     new Chart(document.getElementById("chart-by-date"), {
       type: "line",
@@ -219,7 +221,7 @@
     new Chart(document.getElementById("chart-by-status"), {
       type: "bar",
       data: {
-        labels: d.feedbacks_by_status.map((x) => x.status),
+        labels: d.feedbacks_by_status.map((x) => statusLabels[x.status] || x.status),
         datasets: [{
           label: "Số Feedback",
           data: d.feedbacks_by_status.map((x) => x.count),
@@ -247,7 +249,7 @@
     new Chart(document.getElementById("chart-by-priority"), {
       type: "bar",
       data: {
-        labels: d.by_priority.map((x) => x.level),
+        labels: d.by_priority.map((x) => priorityLabels[x.level] || x.level),
         datasets: [{
           label: "Số Insight",
           data: d.by_priority.map((x) => x.count),

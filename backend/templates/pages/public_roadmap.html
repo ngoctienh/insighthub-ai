@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Public Product Roadmap — InsightHub AI{% endblock %}
+{% block title %}Roadmap Công khai — InsightHub AI{% endblock %}
 
 {% block body %}
 <div class="min-h-screen bg-slate-50">
@@ -9,7 +9,7 @@
         <div class="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center">
           <i data-lucide="globe" class="w-4 h-4 text-white"></i>
         </div>
-        Public Product Roadmap
+        Roadmap Công khai
       </a>
       <div class="flex items-center gap-2">
         {% if user.is_authenticated %}
@@ -18,7 +18,7 @@
             class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand-600 text-white text-xs sm:text-sm font-semibold hover:bg-brand-700"
           >
             <i data-lucide="arrow-left" class="w-4 h-4"></i>
-            {% if is_internal %}Về Roadmap nội bộ{% else %}Về Customer Portal{% endif %}
+            {% if is_internal %}Về Roadmap nội bộ{% else %}Về Cổng Khách hàng{% endif %}
           </a>
         {% else %}
           <a href="{% url 'web-login' %}" class="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold">

@@ -7,7 +7,7 @@
       </div>
       <div>
         <div class="text-sm font-bold text-white tracking-tight">InsightHub AI</div>
-        <div class="text-[11px] text-slate-400">Product Discovery</div>
+        <div class="text-[11px] text-slate-400">Quản lý Feedback AI</div>
       </div>
     </a>
     {% if is_mobile %}
@@ -20,7 +20,7 @@
   <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
     {% if not is_internal %}
       <a href="{% url 'web-portal' %}" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if active_nav == 'portal' %}bg-brand-600/20 text-white border border-brand-500/30{% else %}text-slate-400 hover:text-white hover:bg-slate-900{% endif %}">
-        <span class="flex items-center gap-3"><i data-lucide="compass" class="w-4 h-4 shrink-0"></i>Customer Portal</span>
+        <span class="flex items-center gap-3"><i data-lucide="compass" class="w-4 h-4 shrink-0"></i>Cổng Khách hàng</span>
       </a>
     {% endif %}
 
@@ -32,36 +32,36 @@
 
     {% if user|has_perm:"inbox" %}
       <a href="{% url 'web-inbox' %}" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if active_nav == 'inbox' %}bg-brand-600/20 text-white border border-brand-500/30{% else %}text-slate-400 hover:text-white hover:bg-slate-900{% endif %}">
-        <span class="flex items-center gap-3"><i data-lucide="inbox" class="w-4 h-4 shrink-0"></i>{% if is_internal %}Feedback Inbox{% else %}Phản hồi của tôi{% endif %}</span>
+        <span class="flex items-center gap-3"><i data-lucide="inbox" class="w-4 h-4 shrink-0"></i>{% if is_internal %}Hộp thư Feedback{% else %}Phản hồi của tôi{% endif %}</span>
       </a>
     {% endif %}
 
     {% if user|has_perm:"sources" %}
       <a href="{% url 'web-sources' %}" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if active_nav == 'sources' %}bg-brand-600/20 text-white border border-brand-500/30{% else %}text-slate-400 hover:text-white hover:bg-slate-900{% endif %}">
-        <span class="flex items-center gap-3"><i data-lucide="radio" class="w-4 h-4 shrink-0"></i>Multi-source Hub</span>
+        <span class="flex items-center gap-3"><i data-lucide="radio" class="w-4 h-4 shrink-0"></i>Tiếp nhận Đa nguồn</span>
       </a>
     {% endif %}
 
     {% if user|has_perm:"insights" %}
       <a href="{% url 'web-insights' %}" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if active_nav == 'insights' %}bg-brand-600/20 text-white border border-brand-500/30{% else %}text-slate-400 hover:text-white hover:bg-slate-900{% endif %}">
-        <span class="flex items-center gap-3"><i data-lucide="sparkles" class="w-4 h-4 shrink-0"></i>AI Insights</span>
+        <span class="flex items-center gap-3"><i data-lucide="sparkles" class="w-4 h-4 shrink-0"></i>Nhóm Insight AI</span>
       </a>
     {% endif %}
 
     {% if user|has_perm:"kanban" %}
       <a href="{% url 'web-kanban' %}" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if active_nav == 'kanban' %}bg-brand-600/20 text-white border border-brand-500/30{% else %}text-slate-400 hover:text-white hover:bg-slate-900{% endif %}">
-        <span class="flex items-center gap-3"><i data-lucide="kanban" class="w-4 h-4 shrink-0"></i>Kanban Board</span>
+        <span class="flex items-center gap-3"><i data-lucide="kanban" class="w-4 h-4 shrink-0"></i>Bảng Kanban</span>
       </a>
     {% endif %}
 
     {% if user|has_perm:"roadmap" %}
       <a href="{% url 'web-roadmap' %}" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if active_nav == 'roadmap' %}bg-brand-600/20 text-white border border-brand-500/30{% else %}text-slate-400 hover:text-white hover:bg-slate-900{% endif %}">
-        <span class="flex items-center gap-3"><i data-lucide="map" class="w-4 h-4 shrink-0"></i>Product Roadmap</span>
+        <span class="flex items-center gap-3"><i data-lucide="map" class="w-4 h-4 shrink-0"></i>Roadmap Nội bộ</span>
       </a>
     {% endif %}
 
     <a href="{% url 'web-public-roadmap' %}" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if active_nav == 'public_roadmap' %}bg-brand-600/20 text-white border border-brand-500/30{% else %}text-slate-400 hover:text-white hover:bg-slate-900{% endif %}">
-      <span class="flex items-center gap-3"><i data-lucide="globe" class="w-4 h-4 shrink-0"></i>Public Roadmap</span>
+      <span class="flex items-center gap-3"><i data-lucide="globe" class="w-4 h-4 shrink-0"></i>Roadmap Công khai</span>
     </a>
 
     <a href="{% url 'web-notifications' %}" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if active_nav == 'notifications' %}bg-brand-600/20 text-white border border-brand-500/30{% else %}text-slate-400 hover:text-white hover:bg-slate-900{% endif %}">

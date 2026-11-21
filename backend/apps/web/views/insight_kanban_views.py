@@ -34,6 +34,7 @@ from apps.notifications.services import (
 )
 from apps.roadmap.serializers import RoadmapItemSerializer
 from apps.web.decorators import is_json_request, render_forbidden, web_feature_required
+from apps.web.templatetags.web_tags import STATUS_LABELS
 from .helpers import format_serializer_error
 
 logger = logging.getLogger(__name__)
@@ -474,7 +475,7 @@ def kanban_view(request):
                         "assigned_to_name": insight.assigned_to.display_name() if insight.assigned_to else "Chưa gán",
                     }
                 )
-            messages.success(request, f"Đã cập nhật {insight.code} sang {insight.status}.")
+            messages.success(request, f"Đã cập nhật {insight.code} sang {STATUS_LABELS.get(insight.status, insight.status)}.")
             return redirect("/kanban/?mode=insights")
 
         if action == "move_feedback":
@@ -497,7 +498,7 @@ def kanban_view(request):
                 notify_feedback_status_changed(fb, old_status, new_status, actor=request.user)
             if is_json_request(request):
                 return JsonResponse({"id": fb.id, "code": fb.code, "status": fb.status})
-            messages.success(request, f"Đã chuyển {fb.code} sang {fb.status}.")
+            messages.success(request, f"Đã chuyển {fb.code} sang {STATUS_LABELS.get(fb.status, fb.status)}.")
             return redirect("/kanban/?mode=feedbacks")
 
     from apps.feedbacks.services import get_scoped_feedbacks
@@ -518,10 +519,10 @@ def kanban_view(request):
     )
 
     columns = [
-        {"key": "NEW", "label": "New", "dot": "bg-sky-500", "next": "REVIEWING"},
-        {"key": "REVIEWING", "label": "Reviewing", "dot": "bg-violet-500", "next": "PLANNED"},
-        {"key": "PLANNED", "label": "Planned", "dot": "bg-amber-500", "next": "DONE"},
-        {"key": "DONE", "label": "Done", "dot": "bg-emerald-500", "next": None},
+        {"key": "NEW", "label": "Mới", "dot": "bg-sky-500", "next": "REVIEWING", "next_label": "Đang xem xét"},
+        {"key": "REVIEWING", "label": "Đang xem xét", "dot": "bg-violet-500", "next": "PLANNED", "next_label": "Lên kế hoạch"},
+        {"key": "PLANNED", "label": "Đã lên kế hoạch", "dot": "bg-amber-500", "next": "DONE", "next_label": "Hoàn thành"},
+        {"key": "DONE", "label": "Hoàn thành", "dot": "bg-emerald-500", "next": None, "next_label": None},
     ]
     for col in columns:
         col["insights"] = [i for i in insights if i.status == col["key"]]

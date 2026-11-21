@@ -1,8 +1,8 @@
 {% extends "layouts/app.html" %}
 {% load web_tags %}
 
-{% block title %}{% if is_internal %}Feedback Inbox{% else %}Phản hồi của tôi{% endif %} — InsightHub AI{% endblock %}
-{% block page_title %}{% if is_internal %}Feedback Inbox{% else %}Phản hồi của tôi{% endif %}{% endblock %}
+{% block title %}{% if is_internal %}Hộp thư Feedback{% else %}Phản hồi của tôi{% endif %} — InsightHub AI{% endblock %}
+{% block page_title %}{% if is_internal %}Hộp thư Feedback{% else %}Phản hồi của tôi{% endif %}{% endblock %}
 {% block page_subtitle %}Tổng cộng {{ total_count }} phản hồi được lưu trong PostgreSQL{% endblock %}
 {% block page_actions %}
   <button type="button" onclick="window.toggleModal('create-feedback-modal', true)" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
@@ -34,19 +34,19 @@
     <i data-lucide="filter" class="w-4 h-4 text-slate-400 mr-1"></i>
     <select name="status" onchange="this.form.submit()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
       <option value="">Tất cả trạng thái</option>
-      <option value="NEW" {% if filters.status == "NEW" %}selected{% endif %}>New</option>
-      <option value="REVIEWING" {% if filters.status == "REVIEWING" %}selected{% endif %}>Reviewing</option>
-      <option value="PLANNED" {% if filters.status == "PLANNED" %}selected{% endif %}>Planned</option>
-      <option value="DONE" {% if filters.status == "DONE" %}selected{% endif %}>Done</option>
-      <option value="DUPLICATE" {% if filters.status == "DUPLICATE" %}selected{% endif %}>Duplicate</option>
+      <option value="NEW" {% if filters.status == "NEW" %}selected{% endif %}>Mới</option>
+      <option value="REVIEWING" {% if filters.status == "REVIEWING" %}selected{% endif %}>Đang xem xét</option>
+      <option value="PLANNED" {% if filters.status == "PLANNED" %}selected{% endif %}>Đã lên kế hoạch</option>
+      <option value="DONE" {% if filters.status == "DONE" %}selected{% endif %}>Hoàn thành</option>
+      <option value="DUPLICATE" {% if filters.status == "DUPLICATE" %}selected{% endif %}>Trùng lặp</option>
     </select>
 
     <select name="source" onchange="this.form.submit()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
       <option value="">Tất cả nguồn</option>
-      <option value="WEB_FORM" {% if filters.source == "WEB_FORM" %}selected{% endif %}>Website Form</option>
+      <option value="WEB_FORM" {% if filters.source == "WEB_FORM" %}selected{% endif %}>Form Web</option>
       <option value="EMAIL" {% if filters.source == "EMAIL" %}selected{% endif %}>Email</option>
       <option value="LIVE_CHAT" {% if filters.source == "LIVE_CHAT" %}selected{% endif %}>Live Chat</option>
-      <option value="COMMUNITY" {% if filters.source == "COMMUNITY" %}selected{% endif %}>Community</option>
+      <option value="COMMUNITY" {% if filters.source == "COMMUNITY" %}selected{% endif %}>Cộng đồng</option>
     </select>
 
     <select name="tag" onchange="this.form.submit()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
@@ -58,10 +58,10 @@
 
     <select name="impact_level" onchange="this.form.submit()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
       <option value="">Mức ảnh hưởng</option>
-      <option value="CRITICAL" {% if filters.impact_level == "CRITICAL" %}selected{% endif %}>Critical</option>
-      <option value="HIGH" {% if filters.impact_level == "HIGH" %}selected{% endif %}>High</option>
-      <option value="MEDIUM" {% if filters.impact_level == "MEDIUM" %}selected{% endif %}>Medium</option>
-      <option value="LOW" {% if filters.impact_level == "LOW" %}selected{% endif %}>Low</option>
+      <option value="CRITICAL" {% if filters.impact_level == "CRITICAL" %}selected{% endif %}>Nghiêm trọng</option>
+      <option value="HIGH" {% if filters.impact_level == "HIGH" %}selected{% endif %}>Cao</option>
+      <option value="MEDIUM" {% if filters.impact_level == "MEDIUM" %}selected{% endif %}>Trung bình</option>
+      <option value="LOW" {% if filters.impact_level == "LOW" %}selected{% endif %}>Thấp</option>
     </select>
 
     {% if is_internal %}
@@ -110,7 +110,7 @@
                   <span class="text-xs font-mono font-semibold text-brand-600">{{ fb.code }}</span>
                   <span class="text-xs text-slate-400">{{ fb.created_at|date:"d/m/Y" }}</span>
                   {% if fb.is_duplicate_confirmed %}
-                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-700">DUPLICATE</span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-700">TRÙNG LẶP</span>
                   {% endif %}
                 </div>
                 <a href="{% url 'web-feedback-detail' fb.id %}" class="font-semibold text-slate-900 hover:text-brand-600 line-clamp-1">
@@ -223,10 +223,10 @@
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Mức ảnh hưởng</label>
           <select name="impact_level" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
-            <option value="LOW">Low</option>
-            <option value="MEDIUM" selected>Medium</option>
-            <option value="HIGH">High</option>
-            <option value="CRITICAL">Critical</option>
+            <option value="LOW">Thấp</option>
+            <option value="MEDIUM" selected>Trung bình</option>
+            <option value="HIGH">Cao</option>
+            <option value="CRITICAL">Nghiêm trọng</option>
           </select>
         </div>
       </div>
@@ -235,10 +235,10 @@
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Nguồn tiếp nhận</label>
           <select name="source_code" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
-            <option value="WEB_FORM">Website Form</option>
+            <option value="WEB_FORM">Form Web</option>
             <option value="EMAIL">Email</option>
             <option value="LIVE_CHAT">Live Chat</option>
-            <option value="COMMUNITY">Community Forum</option>
+            <option value="COMMUNITY">Cộng đồng</option>
           </select>
         </div>
         <div class="grid grid-cols-2 gap-3">

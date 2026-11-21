@@ -1,8 +1,9 @@
 {% extends "layouts/app.html" %}
+{% load web_tags %}
 
 {% block title %}Thông báo — InsightHub AI{% endblock %}
 {% block page_title %}Trung tâm Thông báo{% endblock %}
-{% block page_subtitle %}Theo dõi cập nhật tiếp nhận, phân công, xác nhận Insight và thay đổi Product Roadmap{% endblock %}
+{% block page_subtitle %}Theo dõi cập nhật tiếp nhận, phân công, xác nhận Insight và thay đổi Roadmap{% endblock %}
 {% block page_actions %}
   <div class="flex items-center gap-2">
     <a href="?unread_only={% if unread_only %}0{% else %}true{% endif %}" class="px-3 py-1.5 rounded-lg border text-xs font-semibold {% if unread_only %}bg-slate-900 text-white border-slate-900{% else %}bg-white text-slate-700 border-slate-300{% endif %}">
@@ -38,7 +39,7 @@
             <div>
               <div class="flex flex-wrap items-center gap-2">
                 <span class="font-bold text-sm text-slate-900">{{ n.title }}</span>
-                <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">{{ n.event_type }}</span>
+                <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">{{ n.event_type|event_label }}</span>
               </div>
               <p class="text-sm text-slate-600 mt-0.5">{{ n.message }}</p>
               <div class="text-xs text-slate-400 mt-1">{{ n.created_at|date:"H:i d/m/Y" }}</div>

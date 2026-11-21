@@ -37,7 +37,7 @@ DEMO_ACCOUNTS = [
     {"label": "Product Manager", "identifier": "pm_minh", "role": "PRODUCT_MANAGER"},
     {"label": "Developer", "identifier": "dev_tuan", "role": "DEVELOPER"},
     {"label": "Customer Support", "identifier": "cs_linh", "role": "CUSTOMER_SUPPORT"},
-    {"label": "Customer", "identifier": "customer_an", "role": "CUSTOMER"},
+    {"label": "Khách hàng", "identifier": "customer_an", "role": "CUSTOMER"},
 ]
 
 

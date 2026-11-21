@@ -10,6 +10,13 @@ PRIORITY_STYLES = {
     "LOW": "bg-slate-100 text-slate-700 border-slate-200",
 }
 
+PRIORITY_LABELS = {
+    "CRITICAL": "Nghiêm trọng",
+    "HIGH": "Cao",
+    "MEDIUM": "Trung bình",
+    "LOW": "Thấp",
+}
+
 STATUS_STYLES = {
     "NEW": "bg-sky-50 text-sky-700 border-sky-200",
     "REVIEWING": "bg-violet-50 text-violet-700 border-violet-200",
@@ -24,40 +31,56 @@ STATUS_STYLES = {
 }
 
 STATUS_LABELS = {
-    "NEW": "New",
-    "REVIEWING": "Reviewing",
-    "PLANNED": "Planned",
-    "DONE": "Done",
-    "IN_PROGRESS": "In Progress",
-    "COMPLETED": "Completed",
-    "DUPLICATE": "Duplicate",
+    "NEW": "Mới",
+    "REVIEWING": "Đang xem xét",
+    "PLANNED": "Đã lên kế hoạch",
+    "DONE": "Hoàn thành",
+    "IN_PROGRESS": "Đang phát triển",
+    "COMPLETED": "Đã ra mắt",
+    "DUPLICATE": "Trùng lặp",
     "PENDING_REVIEW": "Chờ xác nhận",
     "CONFIRMED": "Đã xác nhận",
     "REJECTED": "Đã từ chối",
 }
 
 SOURCE_CONFIG = {
-    "WEB_FORM": ("Website Form", "bg-indigo-50 text-indigo-700 border-indigo-200"),
+    "WEB_FORM": ("Form Web", "bg-indigo-50 text-indigo-700 border-indigo-200"),
     "EMAIL": ("Email", "bg-cyan-50 text-cyan-700 border-cyan-200"),
     "LIVE_CHAT": ("Live Chat", "bg-emerald-50 text-emerald-700 border-emerald-200"),
     "COMMUNITY": ("Cộng đồng", "bg-purple-50 text-purple-700 border-purple-200"),
 }
 
+VISIBILITY_LABELS = {
+    "PUBLIC": "Công khai",
+    "PRIVATE": "Nội bộ",
+}
+
+EVENT_LABELS = {
+    "FEEDBACK_RECEIVED": "Tiếp nhận mới",
+    "FEEDBACK_ASSIGNED": "Phân công xử lý",
+    "STATUS_CHANGED": "Đổi trạng thái",
+    "INSIGHT_CONFIRMED": "Xác nhận Insight",
+    "ROADMAP_UPDATED": "Cập nhật Roadmap",
+    "ISSUE_COMPLETED": "Hoàn thành",
+}
+
 
 @register.simple_tag
 def priority_badge(level: str, score=None):
-    cls = PRIORITY_STYLES.get(level or "LOW", PRIORITY_STYLES["LOW"])
+    code = level or "LOW"
+    cls = PRIORITY_STYLES.get(code, PRIORITY_STYLES["LOW"])
+    label = PRIORITY_LABELS.get(code, code)
     if score is not None and score != "":
         return format_html(
             '<span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold {}">{} <span class="opacity-80">· {}</span></span>',
             cls,
-            level,
+            label,
             score,
         )
     return format_html(
         '<span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold {}">{}</span>',
         cls,
-        level,
+        label,
     )
 
 
@@ -111,3 +134,23 @@ def clamp100(value) -> int:
         return max(0, min(100, int(round(float(value)))))
     except (TypeError, ValueError):
         return 0
+
+
+@register.filter
+def status_label(code: str) -> str:
+    return STATUS_LABELS.get(code or "", code or "")
+
+
+@register.filter
+def priority_label(code: str) -> str:
+    return PRIORITY_LABELS.get(code or "", code or "")
+
+
+@register.filter
+def visibility_label(code: str) -> str:
+    return VISIBILITY_LABELS.get(code or "", code or "")
+
+
+@register.filter
+def event_label(code: str) -> str:
+    return EVENT_LABELS.get(code or "", code or "")

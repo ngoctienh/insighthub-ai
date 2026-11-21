@@ -19,12 +19,12 @@ class Role(models.Model):
 
     FEATURE_MODULES = [
         ("dashboard", "Dashboard", "Xem thống kê KPI và biểu đồ"),
-        ("inbox", "Feedback Inbox", "Xem danh sách và chi tiết phản hồi"),
-        ("sources", "Multi-source Hub", "Tiếp nhận phản hồi đa nguồn"),
-        ("insights", "AI Insights", "Xem nhóm vấn đề & gợi ý trùng lặp"),
-        ("ai_run", "Chạy AI Engine", "Kích hoạt AI phân tích & gom nhóm"),
-        ("kanban", "Kanban Board", "Xem và chuyển trạng thái Kanban"),
-        ("roadmap", "Product Roadmap", "Xem lộ trình sản phẩm nội bộ"),
+        ("inbox", "Hộp thư Feedback", "Xem danh sách và chi tiết phản hồi"),
+        ("sources", "Tiếp nhận Đa nguồn", "Tiếp nhận phản hồi đa nguồn"),
+        ("insights", "Nhóm Insight AI", "Xem nhóm vấn đề & gợi ý trùng lặp"),
+        ("ai_run", "Chạy AI Phân tích", "Kích hoạt AI phân tích & gom nhóm"),
+        ("kanban", "Bảng Kanban", "Xem và chuyển trạng thái Kanban"),
+        ("roadmap", "Roadmap Nội bộ", "Xem lộ trình sản phẩm nội bộ"),
         ("users", "Người dùng", "Truy cập trang danh sách & phân quyền"),
     ]
     ALL_FEATURE_KEYS = [item[0] for item in FEATURE_MODULES]

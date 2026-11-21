@@ -58,7 +58,7 @@
       </div>
 
       <div>
-        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Tóm tắt vấn đề (AI Summarization)</h3>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Tóm tắt vấn đề bằng AI</h3>
         <p class="text-slate-800 leading-relaxed text-sm">{{ insight.description }}</p>
       </div>
 
@@ -137,7 +137,7 @@
                     <span class="text-xs font-mono font-bold text-brand-600">{{ m.feedback.code }}</span>
                     {% source_badge m.feedback.source.code %}
                     {% if m.similarity_to_centroid %}
-                      <span class="text-[11px] text-slate-500">Cosine tâm cụm: {{ m.similarity_to_centroid|mul100 }}%</span>
+                      <span class="text-[11px] text-slate-500">Độ tương đồng tâm cụm: {{ m.similarity_to_centroid|mul100 }}%</span>
                     {% endif %}
                   </div>
                   <a href="{% url 'web-feedback-detail' m.feedback_id %}" class="font-semibold text-sm text-slate-900 hover:underline">{{ m.feedback.title }}</a>
@@ -187,15 +187,15 @@
 
       <div class="space-y-3">
         <div>
-          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1"><span>V — Volume (40%)</span><span>{{ insight.volume_score }}/100</span></div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1"><span>V — Số lượng (40%)</span><span>{{ insight.volume_score }}/100</span></div>
           <div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-indigo-600" style="width: {{ insight.volume_score|clamp100 }}%"></div></div>
         </div>
         <div>
-          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1"><span>I — Impact (35%)</span><span>{{ insight.impact_score }}/100</span></div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1"><span>I — Tác động (35%)</span><span>{{ insight.impact_score }}/100</span></div>
           <div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-amber-500" style="width: {{ insight.impact_score|clamp100 }}%"></div></div>
         </div>
         <div>
-          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1"><span>S — Severity (25%)</span><span>{{ insight.severity_score }}/100</span></div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1"><span>S — Nghiêm trọng (25%)</span><span>{{ insight.severity_score }}/100</span></div>
           <div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-rose-500" style="width: {{ insight.severity_score|clamp100 }}%"></div></div>
         </div>
       </div>
@@ -213,10 +213,10 @@
       <div>
         <label class="block text-xs text-slate-500 mb-1">Cột Kanban</label>
         <select name="status" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
-          <option value="NEW" {% if insight.status == "NEW" %}selected{% endif %}>New</option>
-          <option value="REVIEWING" {% if insight.status == "REVIEWING" %}selected{% endif %}>Reviewing</option>
-          <option value="PLANNED" {% if insight.status == "PLANNED" %}selected{% endif %}>Planned</option>
-          <option value="DONE" {% if insight.status == "DONE" %}selected{% endif %}>Done</option>
+          <option value="NEW" {% if insight.status == "NEW" %}selected{% endif %}>Mới</option>
+          <option value="REVIEWING" {% if insight.status == "REVIEWING" %}selected{% endif %}>Đang xem xét</option>
+          <option value="PLANNED" {% if insight.status == "PLANNED" %}selected{% endif %}>Đã lên kế hoạch</option>
+          <option value="DONE" {% if insight.status == "DONE" %}selected{% endif %}>Hoàn thành</option>
         </select>
       </div>
       {% if can_manage %}
@@ -239,7 +239,7 @@
         <h3 class="font-bold text-slate-900 text-sm">Roadmap đã liên kết</h3>
         {% for rm in roadmap_items %}
           <a href="{% url 'web-roadmap' %}" class="block p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200 text-xs font-semibold text-emerald-900 hover:bg-emerald-50">
-            {{ rm.code }} · {{ rm.title }} ({{ rm.status }})
+            {{ rm.code }} · {{ rm.title }} ({{ rm.status|status_label }})
           </a>
         {% endfor %}
       </div>
@@ -299,29 +299,29 @@
   <!-- Promote to Roadmap Modal -->
   <div id="promote-roadmap-modal" class="fixed inset-0 z-50 bg-slate-900/50 hidden items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl">
-      <h3 class="font-bold text-lg text-slate-900 mb-3">Tạo hạng mục Product Roadmap từ {{ insight.code }}</h3>
+      <h3 class="font-bold text-lg text-slate-900 mb-3">Tạo hạng mục Roadmap từ {{ insight.code }}</h3>
       <form method="post" action="{% url 'web-insight-detail' insight.id %}" class="space-y-3">
         {% csrf_token %}
         <input type="hidden" name="action" value="promote_roadmap" />
         <input type="hidden" name="progress_percent" value="10" />
         <input type="text" name="title" required value="{{ insight.title }}" placeholder="Tên tính năng / cải tiến" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
         <textarea name="description" rows="3" required placeholder="Mô tả nội bộ" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">{{ insight.description }}</textarea>
-        <textarea name="public_description" rows="2" placeholder="Mô tả hiển thị trên Public Roadmap (ẩn thông tin nội bộ)" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">{{ insight.description }}</textarea>
+        <textarea name="public_description" rows="2" placeholder="Mô tả hiển thị trên Roadmap Công khai (ẩn thông tin nội bộ)" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">{{ insight.description }}</textarea>
         <div class="grid grid-cols-3 gap-2">
           <select name="status" class="px-2.5 py-2 rounded-lg border border-slate-300 text-sm bg-white">
-            <option value="PLANNED">Planned</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="COMPLETED">Completed</option>
+            <option value="PLANNED">Đã lên kế hoạch</option>
+            <option value="IN_PROGRESS">Đang phát triển</option>
+            <option value="COMPLETED">Đã ra mắt</option>
           </select>
           <select name="visibility" class="px-2.5 py-2 rounded-lg border border-slate-300 text-sm bg-white">
-            <option value="PUBLIC">Public</option>
-            <option value="PRIVATE">Private</option>
+            <option value="PUBLIC">Công khai</option>
+            <option value="PRIVATE">Nội bộ</option>
           </select>
           <input type="text" name="quarter" value="Q1 2027" placeholder="Q1 2027" class="px-2.5 py-2 rounded-lg border border-slate-300 text-sm" />
         </div>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" onclick="window.toggleModal('promote-roadmap-modal', false)" class="px-4 py-2 rounded-lg border border-slate-300 text-sm">Hủy</button>
-          <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold">Tạo Roadmap Item</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold">Tạo mục Roadmap</button>
         </div>
       </form>
     </div>

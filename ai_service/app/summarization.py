@@ -50,10 +50,19 @@ def _extract_top_phrases(cluster_texts: list[str], top_k: int = 4) -> list[str]:
         return []
 
 
+_SOURCE_LABELS = {
+    "WEB_FORM": "Form Web",
+    "EMAIL": "Email",
+    "LIVE_CHAT": "Live Chat",
+    "COMMUNITY": "Cộng đồng",
+}
+
+
 def _analyze_symptoms_and_domain(feedbacks: list[FeedbackInput]) -> dict[str, Any]:
     joined = " ".join(clean_text(f"{fb.title} {fb.content}").lower() for fb in feedbacks)
     sources = Counter(fb.source_code for fb in feedbacks)
-    top_source = sources.most_common(1)[0][0] if sources else "WEB_FORM"
+    top_source_code = sources.most_common(1)[0][0] if sources else "WEB_FORM"
+    top_source = _SOURCE_LABELS.get(top_source_code, top_source_code)
 
     rules = [
         (
@@ -125,13 +134,13 @@ def _analyze_symptoms_and_domain(feedbacks: list[FeedbackInput]) -> dict[str, An
             r"treo|crash|văng|lag|chậm|đứng máy|hiệu năng|tải lâu",
             "Ứng dụng phản hồi chậm, giật lag hoặc thoát đột ngột",
             [
-                "Giả thuyết cần kiểm tra: việc tải nhiều hình ảnh thực đơn độ phân giải cao cùng lúc hoặc memory leak có thể làm thiết bị cấu hình trung bình bị chậm.",
-                "Giả thuyết cần kiểm tra: một số màn hình chưa có trạng thái tải từng phần (lazy loading) khi mạng yếu.",
+                "Giả thuyết cần kiểm tra: việc tải nhiều hình ảnh thực đơn độ phân giải cao cùng lúc hoặc tràn bộ nhớ có thể làm thiết bị cấu hình trung bình bị chậm.",
+                "Giả thuyết cần kiểm tra: một số màn hình chưa có cơ chế tải từng phần (lazy-load) khi mạng yếu.",
             ],
             "Trải nghiệm duyệt thực đơn và thao tác đặt món bị gián đoạn, gây khó chịu cho người dùng trên thiết bị di động.",
             [
-                "Tối ưu kích thước ảnh, cache dữ liệu thực đơn và áp dụng pagination/lazy-load.",
-                "Thu thập crash telemetry theo phiên bản app/hệ điều hành để khoanh vùng điểm nghẽn.",
+                "Tối ưu kích thước ảnh, lưu đệm (cache) dữ liệu thực đơn và áp dụng phân trang, tải từng phần.",
+                "Thu thập nhật ký lỗi ứng dụng (crash log) theo phiên bản và hệ điều hành để khoanh vùng điểm nghẽn.",
             ],
         ),
     ]

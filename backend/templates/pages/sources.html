@@ -1,8 +1,8 @@
 {% extends "layouts/app.html" %}
 
-{% block title %}Multi-source Feedback Hub — InsightHub AI{% endblock %}
-{% block page_title %}Multi-source Feedback Hub{% endblock %}
-{% block page_subtitle %}Giả lập &amp; tiếp nhận phản hồi từ 4 kênh (Website Form, Email, Live Chat, Cộng đồng) vào cùng bảng feedbacks{% endblock %}
+{% block title %}Tiếp nhận Feedback Đa nguồn — InsightHub AI{% endblock %}
+{% block page_title %}Tiếp nhận Feedback Đa nguồn{% endblock %}
+{% block page_subtitle %}Giả lập &amp; tiếp nhận phản hồi từ 4 kênh (Form Web, Email, Live Chat, Cộng đồng) vào cùng bảng feedbacks{% endblock %}
 
 {% block content %}
 <!-- Channel Tabs -->
@@ -12,28 +12,28 @@
       <i data-lucide="globe" class="w-5 h-5"></i>
       <span class="text-xs font-bold px-2 py-0.5 rounded-full {% if active_tab == 'WEB_FORM' %}bg-white/20 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">{{ source_counts.WEB_FORM|default:0 }}</span>
     </div>
-    <div class="font-semibold text-sm">Website Form</div>
+    <div class="font-semibold text-sm">Form Web</div>
   </a>
   <a href="?tab=EMAIL" class="p-4 rounded-2xl border text-left transition-all {% if active_tab == 'EMAIL' %}bg-brand-600 text-white border-brand-600 shadow-md{% else %}bg-white text-slate-800 border-slate-200 hover:border-brand-300{% endif %}">
     <div class="flex items-center justify-between mb-1.5">
       <i data-lucide="mail" class="w-5 h-5"></i>
       <span class="text-xs font-bold px-2 py-0.5 rounded-full {% if active_tab == 'EMAIL' %}bg-white/20 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">{{ source_counts.EMAIL|default:0 }}</span>
     </div>
-    <div class="font-semibold text-sm">Email Inbox Sim</div>
+    <div class="font-semibold text-sm">Giả lập Email</div>
   </a>
   <a href="?tab=LIVE_CHAT" class="p-4 rounded-2xl border text-left transition-all {% if active_tab == 'LIVE_CHAT' %}bg-brand-600 text-white border-brand-600 shadow-md{% else %}bg-white text-slate-800 border-slate-200 hover:border-brand-300{% endif %}">
     <div class="flex items-center justify-between mb-1.5">
       <i data-lucide="message-square" class="w-5 h-5"></i>
       <span class="text-xs font-bold px-2 py-0.5 rounded-full {% if active_tab == 'LIVE_CHAT' %}bg-white/20 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">{{ source_counts.LIVE_CHAT|default:0 }}</span>
     </div>
-    <div class="font-semibold text-sm">Live Chat Sim</div>
+    <div class="font-semibold text-sm">Giả lập Live Chat</div>
   </a>
   <a href="?tab=COMMUNITY" class="p-4 rounded-2xl border text-left transition-all {% if active_tab == 'COMMUNITY' %}bg-brand-600 text-white border-brand-600 shadow-md{% else %}bg-white text-slate-800 border-slate-200 hover:border-brand-300{% endif %}">
     <div class="flex items-center justify-between mb-1.5">
       <i data-lucide="users" class="w-5 h-5"></i>
       <span class="text-xs font-bold px-2 py-0.5 rounded-full {% if active_tab == 'COMMUNITY' %}bg-white/20 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">{{ source_counts.COMMUNITY|default:0 }}</span>
     </div>
-    <div class="font-semibold text-sm">Community Sim</div>
+    <div class="font-semibold text-sm">Giả lập Cộng đồng</div>
   </a>
 </div>
 
@@ -53,13 +53,13 @@
       <div class="grid sm:grid-cols-3 gap-3">
         <input type="text" name="title" required placeholder="Tiêu đề phản hồi" class="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-300 text-sm" />
         <select name="impact_level" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
-          <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+          <option value="LOW">Thấp</option><option value="MEDIUM" selected>Trung bình</option><option value="HIGH">Cao</option><option value="CRITICAL">Nghiêm trọng</option>
         </select>
       </div>
-      <textarea name="content" required rows="4" placeholder="Nội dung chi tiết từ Website Form..." class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></textarea>
+      <textarea name="content" required rows="4" placeholder="Nội dung chi tiết từ Form Web..." class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></textarea>
       <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
         <i data-lucide="send" class="w-4 h-4"></i>
-        Gửi qua Website Form
+        Gửi qua Form Web
       </button>
     </form>
   {% elif active_tab == "EMAIL" %}
@@ -75,16 +75,16 @@
       {% csrf_token %}
       <input type="hidden" name="source_code" value="EMAIL" />
       <div class="grid sm:grid-cols-3 gap-3">
-        <input id="email-name" type="text" name="sender_name" required value="{{ sample_emails.0.sender_name }}" placeholder="From Name" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
-        <input id="email-addr" type="email" name="sender_email" required value="{{ sample_emails.0.sender_email }}" placeholder="From Email" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <input id="email-name" type="text" name="sender_name" required value="{{ sample_emails.0.sender_name }}" placeholder="Tên người gửi" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <input id="email-addr" type="email" name="sender_email" required value="{{ sample_emails.0.sender_email }}" placeholder="Email người gửi" class="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
         <select name="product_id" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
           {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
         </select>
       </div>
       <div class="grid sm:grid-cols-3 gap-3">
-        <input id="email-subject" type="text" name="title" required value="{{ sample_emails.0.subject }}" placeholder="Email Subject" class="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <input id="email-subject" type="text" name="title" required value="{{ sample_emails.0.subject }}" placeholder="Tiêu đề Email" class="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-300 text-sm" />
         <select id="email-impact" name="impact_level" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
-          <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="CRITICAL" selected>Critical</option>
+          <option value="LOW">Thấp</option><option value="MEDIUM">Trung bình</option><option value="HIGH">Cao</option><option value="CRITICAL" selected>Nghiêm trọng</option>
         </select>
       </div>
       <textarea id="email-content" name="content" rows="5" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-mono">{{ sample_emails.0.content }}</textarea>
@@ -115,7 +115,7 @@
           {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
         </select>
         <select name="impact_level" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
-          <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH" selected>High</option><option value="CRITICAL">Critical</option>
+          <option value="LOW">Thấp</option><option value="MEDIUM">Trung bình</option><option value="HIGH" selected>Cao</option><option value="CRITICAL">Nghiêm trọng</option>
         </select>
       </div>
       <input type="text" name="title" required value="Không áp dụng được mã giảm giá dù đơn vượt mức tối thiểu" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
@@ -136,7 +136,7 @@
           {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
         </select>
         <select name="impact_level" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
-          <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+          <option value="LOW">Thấp</option><option value="MEDIUM" selected>Trung bình</option><option value="HIGH">Cao</option><option value="CRITICAL">Nghiêm trọng</option>
         </select>
       </div>
       <input type="text" name="title" required value="Đề xuất cho phép hẹn giờ giao cố định buổi trưa văn phòng" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
